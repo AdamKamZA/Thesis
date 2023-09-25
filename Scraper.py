@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import urllib.parse
+import re
 
 """
 I need to create a map function that will work for whatever news site title i put in
@@ -84,13 +85,16 @@ class WebsiteMapper(metaclass=ActionDispatcher):
 
     @action_handler("BBC")
     def perform_action1(self):
+        articles = []
         main_content = self.content.find('main')
         main_children = main_content.find_all('div', recursive=False)
         article_containers = main_children[3:]
         article_ul = []
+
         for container in article_containers:
             article_ul.append(container.find('ul'))
         links = []
+
         for story in article_ul:
             link_list = story.find_all("a")
             if link_list != 0 or link_list is not None:
@@ -100,28 +104,11 @@ class WebsiteMapper(metaclass=ActionDispatcher):
 
         # make request to each link and scrape and save content
         base_url = OUTLETS[self.action][self.topic]
-        writers = []
         for link in links:
-            url = urllib.parse.urljoin(base_url, link.get('href'))
-            response = requests.get(url, headers=HEADER)
-            article_content = None
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.content, 'html.parser')
-                article_content = soup
-            else:
-                print("Request failed with status code", response.status_code)
+            if self.topic == 'sport':
+                articles.append(self.bbc_sport(base_url, link))
 
-            try:
-                tag_article = article_content.find('article')
-                header = tag_article.find('header')
-                container = header.find('div')
-                writer = container.find(class_='qa-contributor-name gel-long-primer')
-                writer_content = writer.contents[0][3:]
-                writers.append(writer_content)
-            except AttributeError:
-                print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
-
-        print(writers)
+        print(articles[0])
 
     @action_handler("action2")
     def perform_action2(self):
@@ -131,6 +118,48 @@ class WebsiteMapper(metaclass=ActionDispatcher):
     def perform_action3(self):
         print("Performing action 3")
 
+    def bbc_sport(self, base_url, link):
+        article_obj = {}
+        url = urllib.parse.urljoin(base_url, link.get('href'))
+        response = requests.get(url, headers=HEADER)
+        article_content = None
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            article_content = soup
+        else:
+            print("Request failed with status code", response.status_code)
+
+        try:
+            tag_article = article_content.find('article')
+
+            # get article content and clean
+            content = tag_article.find_all('div', recursive=False)[0]
+
+            # each piece is contained within the article, get all children and then extract text
+            article_text = []
+            for child in content.children:
+                if child.name:
+                    article_text.append(child.get_text())
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text)
+
+            header = tag_article.find('header')
+            # Get h1 for title
+            title = header.find('h1')
+            title_text = title.get_text()
+            container = header.find('div')
+            writer = container.find(class_='qa-contributor-name gel-long-primer')
+            writer_content = writer.contents[0][3:]
+
+            article_obj = {
+                'title': title_text,
+                'writer': writer_content,
+                'content': article_text
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+        return article_obj
 
 # Example usage:
 # if __name__ == "__main__":
