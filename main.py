@@ -10,5 +10,6 @@ def main():
     scraper.scrape()
 
 
+# I think in the nested part, I am still just making a normal request to the same home page and not going into each link
 if __name__ == '__main__':
     main()

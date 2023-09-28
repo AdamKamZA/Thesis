@@ -23,6 +23,19 @@ OUTLETS = {
     }
 }
 
+BBC_SPORT = [
+    "football",
+    "golf",
+    "cricket",
+    "disability-sport",
+    "rugby-union",
+    "american-football",
+    "formula1",
+    "tennis",
+    "athletics",
+    "cycling"
+]
+
 HEADER = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
                                       "Chrome/88.0.4324.150 Safari/537.36"}
 class Scraper:
@@ -42,7 +55,7 @@ class Scraper:
     def scrape_page(self) -> str:
         try:
             assert OUTLETS[self.outlet][self.topic] is not None
-            response = requests.get(OUTLETS[self.outlet][self.topic],headers=self.headers)
+            response = requests.get(OUTLETS[self.outlet][self.topic], headers=self.headers)
             if response.status_code == 200:
                 soup = BeautifulSoup(response.content, 'html.parser')
                 return soup
@@ -86,29 +99,27 @@ class WebsiteMapper(metaclass=ActionDispatcher):
     @action_handler("BBC")
     def perform_action1(self):
         articles = []
-        main_content = self.content.find('main')
-        main_children = main_content.find_all('div', recursive=False)
-        article_containers = main_children[3:]
-        article_ul = []
-
-        for container in article_containers:
-            article_ul.append(container.find('ul'))
         links = []
-
-        for story in article_ul:
-            link_list = story.find_all("a")
-            if link_list != 0 or link_list is not None:
-                links = links + link_list
-            else:
-                print("None value, skipping")
+        if self.topic == 'sport':
+            links = self.bbc_home_links_sport_base()
+        if self.topic == 'politics':
+            links = self.bbc_home_links_politics_base()
 
         # make request to each link and scrape and save content
         base_url = OUTLETS[self.action][self.topic]
         for link in links:
+            article_content, url = self.make_request(link, base_url)
             if self.topic == 'sport':
-                articles.append(self.bbc_sport(base_url, link))
+                article_obj = self.bbc_sport(url, article_content)
+                if article_obj is not None:
+                    articles.append(article_obj)
+            elif self.topic == 'politics':
+                article_obj = self.bbc_politics(url, article_content)
+                if article_obj is not None:
+                    articles.append(article_obj)
 
         print(articles[0])
+        print(len(articles))
 
     @action_handler("action2")
     def perform_action2(self):
@@ -118,9 +129,61 @@ class WebsiteMapper(metaclass=ActionDispatcher):
     def perform_action3(self):
         print("Performing action 3")
 
-    def bbc_sport(self, base_url, link):
+    def bbc_sport(self, url, article_content, nested=False):
+
+        # Single recursive layer to check other sport home pages
+        if not nested:
+            # get last route value to see if its a base page
+            final_route = url.split('/')[-1]
+            if final_route in BBC_SPORT:
+                # Make request using full url, provided from parent make_request call
+                nested_content, nested_url_base = self.make_request(url)
+                nested_links = self.bbc_home_links_sport_base(nested_content)
+                for nested_link in nested_links:
+                    article_content, nested_url = self.make_request(nested_link, url)
+                    self.bbc_sport(nested_url, article_content, True)
+
         article_obj = {}
-        url = urllib.parse.urljoin(base_url, link.get('href'))
+        try:
+            tag_article = article_content.find('article')
+            title = tag_article.find('h1').get_text()
+            author = tag_article.find(class_="qa-contributor-name gel-long-primer")
+            if author is None:
+                author = "BBC - No Explicit Author - " + self.topic
+            else:
+                author = author.get_text()
+
+            # get text for every child element in article tag
+            article_text = []
+            # get first div which contains all content
+            tag_article_content = tag_article.find('div', recursive=False)
+            for child in tag_article_content.children:
+                if child.name:
+                    article_text.append(child.get_text())
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text)
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+        return article_obj
+
+    def make_request(self, link, base_url=None):
+        # Update link grabbing for sport
+        if base_url is not None:
+            url = urllib.parse.urljoin(base_url, link)
+        else:
+            url = link
+
         response = requests.get(url, headers=HEADER)
         article_content = None
         if response.status_code == 200:
@@ -129,36 +192,61 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         else:
             print("Request failed with status code", response.status_code)
 
+        return article_content, url
+
+    def bbc_home_links_sport_base(self, page_content=None):
+        main_content = None
+        if page_content is None:
+            main_content = self.content.select_one("#main-content > div:nth-child(4) > div > div > ul")
+        else:
+            main_content = page_content.select_one("#main-content > div:nth-child(4) > div > div > ul")
+            # For different structures of sport pages
+            if main_content is None:
+                main_content = page_content.find('div', class_="sp-c-cluster")
+        links = [a.get('href') for a in main_content.find_all("a")]
+        return links
+
+    def bbc_home_links_politics_base(self):
+        # could be different for sport and economics etc. as this uses sport page for testing
+        main_content = self.content.select_one('#topos-component > div.no-mpu > div > div:nth-child(2) > div')
+        links = [a.get('href') for a in main_content.find_all("a")]
+        return links
+
+    def bbc_politics(self, url, article_content, nested=False):
+        article_obj = {}
         try:
             tag_article = article_content.find('article')
-
-            # get article content and clean
-            content = tag_article.find_all('div', recursive=False)[0]
-
-            # each piece is contained within the article, get all children and then extract text
             article_text = []
-            for child in content.children:
-                if child.name:
-                    article_text.append(child.get_text())
+            # get article content and clean
+            content = tag_article.find_all(attrs={"data-component": "text-block"})
+            for text_block in content:
+                text_content = text_block.find('p').get_text()
+                article_text.append(text_content)
+
             article_text = " ".join(article_text)
             article_text = re.sub(r'\s+', ' ', article_text)
 
-            header = tag_article.find('header')
-            # Get h1 for title
-            title = header.find('h1')
-            title_text = title.get_text()
-            container = header.find('div')
-            writer = container.find(class_='qa-contributor-name gel-long-primer')
-            writer_content = writer.contents[0][3:]
+            title = article_content.find('h1').get_text()
+            author_container = tag_article.find(attrs={"data-component": "byline-block"})
+            author = ""
+            if author_container is None:
+                print("No author, default BBC politics")
+                author = "BBC - No Explicit Author - " + self.topic
+            else:
+                author = author_container.find(class_="ssrcss-68pt20-Text-TextContributorName e8mq1e96").get_text()
 
             article_obj = {
-                'title': title_text,
-                'writer': writer_content,
+                'title': title,
+                'writer': author,
                 'content': article_text
             }
 
         except AttributeError:
             print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
         return article_obj
 
 # Example usage:
