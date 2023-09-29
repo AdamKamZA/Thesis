@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import urllib.parse
 import re
+from Outlets.BBC import bbc_home_links_sport_base, bbc_home_links_politics_base
 
 """
 I need to create a map function that will work for whatever news site title i put in
@@ -101,9 +102,9 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         articles = []
         links = []
         if self.topic == 'sport':
-            links = self.bbc_home_links_sport_base()
+            links = bbc_home_links_sport_base(self.content)
         if self.topic == 'politics':
-            links = self.bbc_home_links_politics_base()
+            links = bbc_home_links_politics_base(self.content)
 
         # make request to each link and scrape and save content
         base_url = OUTLETS[self.action][self.topic]
@@ -112,13 +113,16 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             if self.topic == 'sport':
                 article_obj = self.bbc_sport(url, article_content)
                 if article_obj is not None:
-                    articles.append(article_obj)
+                    if isinstance(article_obj, list):
+                        articles = articles + article_obj
+                    else:
+                        articles.append(article_obj)
             elif self.topic == 'politics':
                 article_obj = self.bbc_politics(url, article_content)
                 if article_obj is not None:
                     articles.append(article_obj)
 
-        print(articles[0])
+        print(articles[0:10])
         print(len(articles))
 
     @action_handler("action2")
@@ -129,21 +133,42 @@ class WebsiteMapper(metaclass=ActionDispatcher):
     def perform_action3(self):
         print("Performing action 3")
 
+    def make_request(self, link, base_url=None):
+        # Update link grabbing for sport
+        if base_url is not None:
+            url = urllib.parse.urljoin(base_url, link)
+        else:
+            url = link
+
+        response = requests.get(url, headers=HEADER)
+        article_content = None
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            article_content = soup
+        else:
+            print("Request failed with status code", response.status_code)
+
+        return article_content, url
+
     def bbc_sport(self, url, article_content, nested=False):
 
+        article_obj = {}
         # Single recursive layer to check other sport home pages
         if not nested:
+            article_rec_array=[]
             # get last route value to see if its a base page
             final_route = url.split('/')[-1]
             if final_route in BBC_SPORT:
                 # Make request using full url, provided from parent make_request call
                 nested_content, nested_url_base = self.make_request(url)
-                nested_links = self.bbc_home_links_sport_base(nested_content)
+                nested_links = bbc_home_links_sport_base(self.content, nested_content)
                 for nested_link in nested_links:
                     article_content, nested_url = self.make_request(nested_link, url)
-                    self.bbc_sport(nested_url, article_content, True)
+                    article_obj = self.bbc_sport(nested_url, article_content, True)
+                    if article_obj is not None:
+                        article_rec_array.append(article_obj)
+                return article_rec_array
 
-        article_obj = {}
         try:
             tag_article = article_content.find('article')
             title = tag_article.find('h1').get_text()
@@ -176,41 +201,6 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
             return None
         return article_obj
-
-    def make_request(self, link, base_url=None):
-        # Update link grabbing for sport
-        if base_url is not None:
-            url = urllib.parse.urljoin(base_url, link)
-        else:
-            url = link
-
-        response = requests.get(url, headers=HEADER)
-        article_content = None
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            article_content = soup
-        else:
-            print("Request failed with status code", response.status_code)
-
-        return article_content, url
-
-    def bbc_home_links_sport_base(self, page_content=None):
-        main_content = None
-        if page_content is None:
-            main_content = self.content.select_one("#main-content > div:nth-child(4) > div > div > ul")
-        else:
-            main_content = page_content.select_one("#main-content > div:nth-child(4) > div > div > ul")
-            # For different structures of sport pages
-            if main_content is None:
-                main_content = page_content.find('div', class_="sp-c-cluster")
-        links = [a.get('href') for a in main_content.find_all("a")]
-        return links
-
-    def bbc_home_links_politics_base(self):
-        # could be different for sport and economics etc. as this uses sport page for testing
-        main_content = self.content.select_one('#topos-component > div.no-mpu > div > div:nth-child(2) > div')
-        links = [a.get('href') for a in main_content.find_all("a")]
-        return links
 
     def bbc_politics(self, url, article_content, nested=False):
         article_obj = {}

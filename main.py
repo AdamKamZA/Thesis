@@ -1,4 +1,4 @@
-from DBHandler import Handler
+from Thesis.Data.DBHandler import Handler
 from Scraper import Scraper
 
 def main():
@@ -6,7 +6,7 @@ def main():
     # handler = Handler()
     # handler.count_author()
     # handler.close()
-    scraper = Scraper('BBC', 'sport')
+    scraper = Scraper('BBC', 'politics')
     scraper.scrape()
 
 

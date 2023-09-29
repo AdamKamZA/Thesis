@@ -1,5 +1,5 @@
 import pandas as pd
-from Database import DB
+from Thesis.Data.Database import DB
 
 
 class Handler:
