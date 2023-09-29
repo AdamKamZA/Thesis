@@ -2,7 +2,8 @@ import requests
 from bs4 import BeautifulSoup
 import urllib.parse
 import re
-from Outlets.BBC import bbc_home_links_sport_base, bbc_home_links_politics_base
+from Outlets.BBC import bbc_home_links_sport_base, bbc_home_links_politics_base, bbc_home_links_climate_base,\
+    bbc_home_links_global_affairs_base, bbc_home_links_economics_base
 
 """
 I need to create a map function that will work for whatever news site title i put in
@@ -105,6 +106,12 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             links = bbc_home_links_sport_base(self.content)
         if self.topic == 'politics':
             links = bbc_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = bbc_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = bbc_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = bbc_home_links_economics_base(self.content)
 
         # make request to each link and scrape and save content
         base_url = OUTLETS[self.action][self.topic]
@@ -117,8 +124,8 @@ class WebsiteMapper(metaclass=ActionDispatcher):
                         articles = articles + article_obj
                     else:
                         articles.append(article_obj)
-            elif self.topic == 'politics':
-                article_obj = self.bbc_politics(url, article_content)
+            elif self.topic in ['politics', 'climate', 'global affairs', 'economics']:
+                article_obj = self.bbc_politics_climate_affairs(url, article_content)
                 if article_obj is not None:
                     articles.append(article_obj)
 
@@ -202,7 +209,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             return None
         return article_obj
 
-    def bbc_politics(self, url, article_content, nested=False):
+    def bbc_politics_climate_affairs(self, url, article_content):
         article_obj = {}
         try:
             tag_article = article_content.find('article')
@@ -220,7 +227,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             author_container = tag_article.find(attrs={"data-component": "byline-block"})
             author = ""
             if author_container is None:
-                print("No author, default BBC politics")
+                print(f"No author, default BBC {self.topic}")
                 author = "BBC - No Explicit Author - " + self.topic
             else:
                 author = author_container.find(class_="ssrcss-68pt20-Text-TextContributorName e8mq1e96").get_text()
@@ -238,6 +245,10 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
             return None
         return article_obj
+
+    def bbc_climate(self, url, article_content):
+
+        return {}
 
 # Example usage:
 # if __name__ == "__main__":

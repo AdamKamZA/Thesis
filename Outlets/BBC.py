@@ -15,3 +15,18 @@ def bbc_home_links_politics_base(content):
     main_content = content.select_one('#topos-component > div.no-mpu > div > div:nth-child(2) > div')
     links = [a.get('href') for a in main_content.find_all("a")]
     return links
+
+def bbc_home_links_climate_base(content):
+    main_content = content.find(id="index-page")
+    links = [a.get('href') for a in main_content.find_all("a")]
+    return links
+
+def bbc_home_links_global_affairs_base(content):
+    main_content = content.select_one("#topos-component > div.no-mpu")
+    links = [a.get('href') for a in main_content.find_all("a")]
+    return links
+
+def bbc_home_links_economics_base(content):
+    main_content = content.select_one("#topos-component > div.no-mpu > div > div:nth-child(2)")
+    links = [a.get('href') for a in main_content.find_all("a")]
+    return links
