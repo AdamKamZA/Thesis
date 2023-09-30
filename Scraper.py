@@ -21,6 +21,13 @@ OUTLETS = {
         'climate': 'https://www.news24.com/fin24/climate_future',
         'global affairs': 'https://www.news24.com/news24/world',
         'economics': 'https://www.news24.com/fin24/economy'
+    },
+    'ALJAZEERA':{
+        'sport': 'https://www.aljazeera.com/sports/',
+        'politics': 'https://www.aljazeera.com/tag/politics/',
+        'climate': 'https://www.aljazeera.com/climate-crisis/',
+        'global affairs': 'https://www.aljazeera.com/news/',
+        'economics': 'https://www.aljazeera.com/economy/'
     }
 }
 
@@ -99,7 +106,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         return decorator
 
     @action_handler("action3")
-    def perform_action3(self):
+    def perform_actionNumberHere(self):
         print("Performing action 3")
 
     def make_request(self, link, base_url=None):
@@ -119,7 +126,15 @@ class WebsiteMapper(metaclass=ActionDispatcher):
 
         return article_content, url
 
+    # region Al Jazeera
+
+    @action_handler("ALJAZEERA")
+    def perform_action3(self):
+        print("Performing action 3")
+    # endregion
+
     # region NEWS24
+
     @action_handler("NEWS24")
     def perform_action2(self):
         articles = []
