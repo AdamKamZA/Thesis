@@ -4,16 +4,7 @@ import urllib.parse
 import re
 from Outlets.BBC import bbc_home_links_sport_base, bbc_home_links_politics_base, bbc_home_links_climate_base,\
     bbc_home_links_global_affairs_base, bbc_home_links_economics_base
-
-"""
-I need to create a map function that will work for whatever news site title i put in
-This title will route to its own unique cleanup function
-The general request, and post to db will remain the same, as well as clean up, it will all be formatted accordingly
-"""
-
-"""
-Define an object that maps a topic and outlet to their base source, makes things easier to manage
-"""
+from Outlets.NEWS24 import news24_home_links_sport_base
 
 OUTLETS = {
     'BBC': {
@@ -22,6 +13,13 @@ OUTLETS = {
         'climate': 'https://www.bbc.com/news/science-environment-56837908',
         'global affairs': 'https://www.bbc.com/news/world',
         'economics': 'https://www.bbc.com/news/business/economy'
+    },
+    'NEWS24': {
+        'sport': 'https://www.news24.com/sport',
+        'politics': 'https://www.news24.com/news24/politics',
+        'climate': 'https://www.news24.com/fin24/climate_future',
+        'global affairs': 'https://www.news24.com/news24/world',
+        'economics': 'https://www.news24.com/fin24/economy'
     }
 }
 
@@ -37,6 +35,7 @@ BBC_SPORT = [
     "athletics",
     "cycling"
 ]
+
 
 HEADER = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
                                       "Chrome/88.0.4324.150 Safari/537.36"}
@@ -98,44 +97,6 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             return func
         return decorator
 
-    @action_handler("BBC")
-    def perform_action1(self):
-        articles = []
-        links = []
-        if self.topic == 'sport':
-            links = bbc_home_links_sport_base(self.content)
-        if self.topic == 'politics':
-            links = bbc_home_links_politics_base(self.content)
-        if self.topic == 'climate':
-            links = bbc_home_links_climate_base(self.content)
-        if self.topic == 'global affairs':
-            links = bbc_home_links_global_affairs_base(self.content)
-        if self.topic == 'economics':
-            links = bbc_home_links_economics_base(self.content)
-
-        # make request to each link and scrape and save content
-        base_url = OUTLETS[self.action][self.topic]
-        for link in links:
-            article_content, url = self.make_request(link, base_url)
-            if self.topic == 'sport':
-                article_obj = self.bbc_sport(url, article_content)
-                if article_obj is not None:
-                    if isinstance(article_obj, list):
-                        articles = articles + article_obj
-                    else:
-                        articles.append(article_obj)
-            elif self.topic in ['politics', 'climate', 'global affairs', 'economics']:
-                article_obj = self.bbc_politics_climate_affairs(url, article_content)
-                if article_obj is not None:
-                    articles.append(article_obj)
-
-        print(articles[0:10])
-        print(len(articles))
-
-    @action_handler("action2")
-    def perform_action2(self):
-        print("Performing action 2")
-
     @action_handler("action3")
     def perform_action3(self):
         print("Performing action 3")
@@ -157,8 +118,86 @@ class WebsiteMapper(metaclass=ActionDispatcher):
 
         return article_content, url
 
-    def bbc_sport(self, url, article_content, nested=False):
+    # region NEWS24
+    @action_handler("NEWS24")
+    def perform_action2(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = news24_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            # TODO Update to news24
+            links = bbc_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            # TODO Update to news24
+            links = bbc_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            # TODO Update to news24
+            links = bbc_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            # TODO Update to news24
+            links = bbc_home_links_economics_base(self.content)
 
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            if self.topic == 'sport':
+                article_obj = self.news24_sport(url, article_content)
+                if article_obj is not None and len(article_obj['content']) > 0:
+                    if isinstance(article_obj, list):
+                        articles = articles + article_obj
+                    else:
+                        articles.append(article_obj)
+            elif self.topic in ['politics', 'climate', 'global affairs', 'economics']:
+                article_obj = self.bbc_politics_climate_affairs(url, article_content)
+                if article_obj is not None and len(article_obj['content']) > 0:
+                    articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def news24_sport(self, url, article_content):
+        article_obj = {}
+    # endregion
+
+    # region BBC
+
+    @action_handler("BBC")
+    def perform_action1(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = bbc_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = bbc_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = bbc_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = bbc_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = bbc_home_links_economics_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            if self.topic == 'sport':
+                article_obj = self.bbc_sport(url, article_content)
+                if article_obj is not None and len(article_obj['content']) > 0:
+                    if isinstance(article_obj, list):
+                        articles = articles + article_obj
+                    else:
+                        articles.append(article_obj)
+            elif self.topic in ['politics', 'climate', 'global affairs', 'economics']:
+                article_obj = self.bbc_politics_climate_affairs(url, article_content)
+                if article_obj is not None and len(article_obj['content']) > 0:
+                    articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def bbc_sport(self, url, article_content, nested=False):
         article_obj = {}
         # Single recursive layer to check other sport home pages
         if not nested:
@@ -177,6 +216,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
                 return article_rec_array
 
         try:
+
             tag_article = article_content.find('article')
             title = tag_article.find('h1').get_text()
             author = tag_article.find(class_="qa-contributor-name gel-long-primer")
@@ -184,7 +224,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
                 author = "BBC - No Explicit Author - " + self.topic
             else:
                 author = author.get_text()
-
+            time = article_content.find('time').get('datetime')
             # get text for every child element in article tag
             article_text = []
             # get first div which contains all content
@@ -198,7 +238,8 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             article_obj = {
                 'title': title,
                 'writer': author,
-                'content': article_text
+                'content': article_text,
+                'publish_time': time
             }
 
         except AttributeError:
@@ -213,15 +254,6 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         article_obj = {}
         try:
             tag_article = article_content.find('article')
-            article_text = []
-            # get article content and clean
-            content = tag_article.find_all(attrs={"data-component": "text-block"})
-            for text_block in content:
-                text_content = text_block.find('p').get_text()
-                article_text.append(text_content)
-
-            article_text = " ".join(article_text)
-            article_text = re.sub(r'\s+', ' ', article_text)
 
             title = article_content.find('h1').get_text()
             author_container = tag_article.find(attrs={"data-component": "byline-block"})
@@ -232,10 +264,23 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             else:
                 author = author_container.find(class_="ssrcss-68pt20-Text-TextContributorName e8mq1e96").get_text()
 
+            time = article_content.find('time').get('datetime')
+
+            article_text = []
+            # get article content and clean
+            content = tag_article.find_all(attrs={"data-component": "text-block"})
+            for text_block in content:
+                text_content = text_block.find('p').get_text()
+                article_text.append(text_content)
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text)
+
             article_obj = {
                 'title': title,
                 'writer': author,
-                'content': article_text
+                'content': article_text,
+                'publish_time': time
             }
 
         except AttributeError:
@@ -246,11 +291,5 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             return None
         return article_obj
 
-    def bbc_climate(self, url, article_content):
+    # endregion
 
-        return {}
-
-# Example usage:
-# if __name__ == "__main__":
-#     my_instance = WebsiteMapper('BBC')  # Replace with the desired action
-#     my_instance.execute()
