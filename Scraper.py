@@ -4,7 +4,8 @@ import urllib.parse
 import re
 from Outlets.BBC import bbc_home_links_sport_base, bbc_home_links_politics_base, bbc_home_links_climate_base,\
     bbc_home_links_global_affairs_base, bbc_home_links_economics_base
-from Outlets.NEWS24 import news24_home_links_sport_base, news24_home_links_politics_base, news24_content
+from Outlets.NEWS24 import news24_home_links_sport_base, news24_home_links_politics_base, news24_content, \
+    news24_home_links_climate_base, news24_home_links_global_affairs_base, news24_home_links_economics_base
 
 OUTLETS = {
     'BBC': {
@@ -128,29 +129,21 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         if self.topic == 'politics':
             links = news24_home_links_politics_base(self.content)
         if self.topic == 'climate':
-            # TODO Update to news24
-            links = bbc_home_links_climate_base(self.content)
+            links = news24_home_links_climate_base(self.content)
         if self.topic == 'global affairs':
-            # TODO Update to news24
-            links = bbc_home_links_global_affairs_base(self.content)
+            links = news24_home_links_global_affairs_base(self.content)
         if self.topic == 'economics':
-            # TODO Update to news24
-            links = bbc_home_links_economics_base(self.content)
+            links = news24_home_links_economics_base(self.content)
 
         # make request to each link and scrape and save content
         base_url = OUTLETS[self.action][self.topic]
         for link in links:
             article_content, url = self.make_request(link, base_url)
-            if self.topic in['sport', 'politics']:
-                article_obj = self.news24_sport_politics(url, article_content)
-                if article_obj is not None and len(article_obj['content']) > 0:
-                    if isinstance(article_obj, list):
-                        articles = articles + article_obj
-                    else:
-                        articles.append(article_obj)
-            elif self.topic in ['politics', 'climate', 'global affairs', 'economics']:
-                article_obj = self.bbc_politics_climate_affairs(url, article_content)
-                if article_obj is not None and len(article_obj['content']) > 0:
+            article_obj = self.news24_sport_politics(url, article_content)
+            if article_obj is not None and len(article_obj['content']) > 0:
+                if isinstance(article_obj, list):
+                    articles = articles + article_obj
+                else:
                     articles.append(article_obj)
 
         print(articles[0:10])
