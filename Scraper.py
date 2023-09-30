@@ -11,7 +11,9 @@ from Outlets.AL_JAZEERA import al_jazeera_home_links_sport_base, al_jazeera_home
 from Outlets.HINDUSTANTIMES import hindu_times_home_links_sport_base, hindu_times_home_links_politics_base, \
     hindu_times_home_links_climate_base, hindu_times_home_links_global_affairs_base, \
     hindu_times_home_links_economics_base
-from Outlets.TIMESOFINDIA import times_of_india_home_links_sport_base, times_of_india_home_links_politics_base
+from Outlets.TIMESOFINDIA import times_of_india_home_links_sport_base, times_of_india_home_links_politics_base, \
+    times_of_india_home_links_climate_base, times_of_india_home_links_global_affairs_base, \
+    times_of_india_home_links_economics_base
 
 OUTLETS = {
     'BBC': {
@@ -157,11 +159,11 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         if self.topic == 'politics':
             links = times_of_india_home_links_politics_base(self.content)
         if self.topic == 'climate':
-            links = hindu_times_home_links_climate_base(self.content)
+            links = times_of_india_home_links_climate_base(self.content)
         if self.topic == 'global affairs':
-            links = hindu_times_home_links_global_affairs_base(self.content)
+            links = times_of_india_home_links_global_affairs_base(self.content)
         if self.topic == 'economics':
-            links = hindu_times_home_links_economics_base(self.content)
+            links = times_of_india_home_links_economics_base(self.content)
 
         # make request to each link and scrape and save content
         base_url = OUTLETS[self.action][self.topic]
