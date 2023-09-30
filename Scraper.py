@@ -11,6 +11,7 @@ from Outlets.AL_JAZEERA import al_jazeera_home_links_sport_base, al_jazeera_home
 from Outlets.HINDUSTANTIMES import hindu_times_home_links_sport_base, hindu_times_home_links_politics_base, \
     hindu_times_home_links_climate_base, hindu_times_home_links_global_affairs_base, \
     hindu_times_home_links_economics_base
+from Outlets.TIMESOFINDIA import times_of_india_home_links_sport_base, times_of_india_home_links_politics_base
 
 OUTLETS = {
     'BBC': {
@@ -27,26 +28,26 @@ OUTLETS = {
         'global affairs': 'https://www.news24.com/news24/world',
         'economics': 'https://www.news24.com/fin24/economy'
     },
-    'ALJAZEERA':{
+    'ALJAZEERA': {
         'sport': 'https://www.aljazeera.com/sports/',
         'politics': 'https://www.aljazeera.com/tag/politics/',
         'climate': 'https://www.aljazeera.com/climate-crisis/',
         'global affairs': 'https://www.aljazeera.com/news/',
         'economics': 'https://www.aljazeera.com/economy/'
     },
-    'HINDUSTANTIMES':{
+    'HINDUSTANTIMES': {
         'sport': 'https://www.hindustantimes.com/sports',
         'politics': 'https://www.hindustantimes.com/topic/politics/news',
         'climate': 'https://www.hindustantimes.com/topic/climate-change/news',
         'global affairs': 'https://www.hindustantimes.com/world-news',
         'economics': 'https://www.hindustantimes.com/topic/economy/news'
     },
-    "TIMESOFINDIA":{
-        'sport': 'https://www.hindustantimes.com/sports',
-        'politics': 'https://www.hindustantimes.com/topic/politics/news',
-        'climate': 'https://www.hindustantimes.com/topic/climate-change/news',
-        'global affairs': 'https://www.hindustantimes.com/world-news',
-        'economics': 'https://www.hindustantimes.com/topic/economy/news'
+    "TIMESOFINDIA": {
+        'sport': 'https://timesofindia.indiatimes.com/sports',
+        'politics': 'https://timesofindia.indiatimes.com/politics/news',
+        'climate': 'https://timesofindia.indiatimes.com/topic/climate-change/news',
+        'global affairs': 'https://timesofindia.indiatimes.com/topic/world-affairs/news',
+        'economics': 'https://timesofindia.indiatimes.com/business/economy'
     }
 }
 
@@ -144,6 +145,81 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             print("Request failed with status code", response.status_code)
 
         return article_content, url
+
+    # region Times of India
+
+    @action_handler("TIMESOFINDIA")
+    def perform_action5(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = times_of_india_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = times_of_india_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = hindu_times_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = hindu_times_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = hindu_times_home_links_economics_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            article_obj = self.times_india_all(url, article_content)
+            if article_obj is not None and len(article_obj['content']) > 0:
+                if isinstance(article_obj, list):
+                    articles = articles + article_obj
+                else:
+                    articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def times_india_all(self, url, article_content):
+        article_obj = {}
+        try:
+            title = article_content.find('h1').get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            header_content = article_content.find(class_="xf8Pm byline")
+            author = header_content.find('a')
+            if author is None:
+                author = "TIMESOFINDIA - No Explicit Author - " + self.topic
+            else:
+                author = author.get_text()
+                author = re.sub(r'\s+', ' ', author.strip())
+            # Getting first simple date and its last child - this is the better date format
+            time = header_content.find('span').get_text()
+
+            article_with_extras = article_content.find('div', attrs={'data-articlebody': '1'}).\
+                find_all('div', recursive=False)[-1]
+            divs_to_remove = article_with_extras.find_all('div')
+
+            # Loop through the divs and extract each one
+            for div in divs_to_remove:
+                div.extract()
+            article_text = article_with_extras.get_text()
+            article_text = re.sub(r'\s+', ' ', article_text)
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time,
+                'link': url
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+
+    # endregion
 
     # region Hindustan Times
 
