@@ -159,6 +159,48 @@ class WebsiteMapper(metaclass=ActionDispatcher):
 
     def news24_sport(self, url, article_content):
         article_obj = {}
+        try:
+            is_locked = True if article_content.find(class_="article__prime") is not None else False
+            if is_locked:
+                print("Premium article, skipping: ", url)
+                return None
+
+            title = article_content.find('h1').get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_content.find(class_="article__author")
+            if author is None:
+                author = "NEWS24 - No Explicit Author - " + self.topic
+            else:
+                author = article_content.get_text()
+            # TODO Convert time to date function
+            time = article_content.find(class_="article__date").get_text()
+
+            contents = article_content.find(class_="article__body NewsArticle").find_all(['strong', 'p'])
+            # print(content)
+            article_text = []
+            for tag in contents:
+                text = tag.get_text()
+                article_text.append(text)
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text)
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+
     # endregion
 
     # region BBC
@@ -248,6 +290,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         except IndexError:
             print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
             return None
+
         return article_obj
 
     def bbc_politics_climate_affairs(self, url, article_content):
