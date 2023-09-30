@@ -6,6 +6,9 @@ from Outlets.BBC import bbc_home_links_sport_base, bbc_home_links_politics_base,
     bbc_home_links_global_affairs_base, bbc_home_links_economics_base
 from Outlets.NEWS24 import news24_home_links_sport_base, news24_home_links_politics_base, news24_content, \
     news24_home_links_climate_base, news24_home_links_global_affairs_base, news24_home_links_economics_base
+from Outlets.AL_JAZEERA import al_jazeera_home_links_sport_base, al_jazeera_home_links_politics_base, \
+    al_jazeera_home_links_climate_base, al_jazeera_home_links_global_affairs_base, al_jazeera_home_links_economics_base
+
 
 OUTLETS = {
     'BBC': {
@@ -61,7 +64,7 @@ class Scraper:
         outlet_instance = WebsiteMapper(self.outlet, self.topic, soup_content)
         outlet_instance.execute()
 
-    def scrape_page(self) -> str:
+    def scrape_page(self) -> BeautifulSoup:
         try:
             assert OUTLETS[self.outlet][self.topic] is not None
             response = requests.get(OUTLETS[self.outlet][self.topic], headers=self.headers)
@@ -130,7 +133,79 @@ class WebsiteMapper(metaclass=ActionDispatcher):
 
     @action_handler("ALJAZEERA")
     def perform_action3(self):
-        print("Performing action 3")
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = al_jazeera_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = al_jazeera_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = al_jazeera_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = al_jazeera_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = al_jazeera_home_links_economics_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            article_obj = self.al_jazeera_all(url, article_content)
+            if article_obj is not None and len(article_obj['content']) > 0:
+                if isinstance(article_obj, list):
+                    articles = articles + article_obj
+                else:
+                    articles.append(article_obj)
+
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def al_jazeera_all(self, url, article_content):
+        article_obj = {}
+        try:
+            title = article_content.find('h1').get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_content.find(class_="article-author-name-item")
+            if author is None:
+                author = "ALJAZEERA - No Explicit Author - " + self.topic
+            else:
+                author = author.get_text()
+                author = re.sub(r'\s+', ' ', author.strip())
+
+            # Getting first simple date and its last child - this is the better date format
+            time = article_content.find(class_="date-simple").find_all('span')[-1].get_text()
+
+            # getting article div in cleaner method, last is always the sources and then the p containers of text
+            contents = article_content.find('main').find_all('div', recursive=False)[-2].find_all('p', recursive=False)
+            if not contents:
+                contents = article_content.find('main').find_all('div', recursive=False)[-2].find_all('p')
+
+            # print("TITLE -- ", title)
+            # print(contents)
+            article_text = []
+            for tag in contents:
+                text = tag.get_text()
+                article_text.append(text)
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text)
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
     # endregion
 
     # region NEWS24
@@ -154,7 +229,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         base_url = OUTLETS[self.action][self.topic]
         for link in links:
             article_content, url = self.make_request(link, base_url)
-            article_obj = self.news24_sport_politics(url, article_content)
+            article_obj = self.news24_all(url, article_content)
             if article_obj is not None and len(article_obj['content']) > 0:
                 if isinstance(article_obj, list):
                     articles = articles + article_obj
@@ -164,7 +239,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         print(articles[0:10])
         print(len(articles))
 
-    def news24_sport_politics(self, url, article_content):
+    def news24_all(self, url, article_content):
         article_obj = {}
         try:
             is_locked = True if article_content.find(class_="article__prime") is not None else False
