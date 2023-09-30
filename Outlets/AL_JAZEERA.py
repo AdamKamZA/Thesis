@@ -5,6 +5,7 @@ def al_jazeera_home_links_sport_base(content):
     all_content = [featured_content, other_content]
     for tag in all_content:
         links = links + [a.get('href') for a in tag.find_all('a')]
+    links = list(set(links))
     return links
 
 
@@ -15,6 +16,7 @@ def al_jazeera_home_links_politics_base(content):
     all_content = [featured_content, other_content]
     for tag in all_content:
         links = links + [a.get('href') for a in tag.find_all('a')]
+    links = list(set(links))
     return links
 
 
@@ -26,6 +28,7 @@ def al_jazeera_home_links_climate_base(content):
     all_content = [featured_content, other_content]
     for tag in all_content:
         links = links + [a.get('href') for a in tag.find_all('a')]
+    links = list(set(links))
     return links
 
 
@@ -36,6 +39,7 @@ def al_jazeera_home_links_global_affairs_base(content):
     all_content = [featured_content, other_content]
     for tag in all_content:
         links = links + [a.get('href') for a in tag.find_all('a')]
+    links = list(set(links))
     return links
 
 
@@ -46,6 +50,7 @@ def al_jazeera_home_links_economics_base(content):
     all_content = [featured_content, other_content]
     for tag in all_content:
         links = links + [a.get('href') for a in tag.find_all('a')]
+    links = list(set(links))
     return links
 
 

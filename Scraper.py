@@ -8,7 +8,7 @@ from Outlets.NEWS24 import news24_home_links_sport_base, news24_home_links_polit
     news24_home_links_climate_base, news24_home_links_global_affairs_base, news24_home_links_economics_base
 from Outlets.AL_JAZEERA import al_jazeera_home_links_sport_base, al_jazeera_home_links_politics_base, \
     al_jazeera_home_links_climate_base, al_jazeera_home_links_global_affairs_base, al_jazeera_home_links_economics_base
-
+from Outlets.HINDUSTANTIMES import hindu_times_home_links_sport_base
 
 OUTLETS = {
     'BBC': {
@@ -31,6 +31,13 @@ OUTLETS = {
         'climate': 'https://www.aljazeera.com/climate-crisis/',
         'global affairs': 'https://www.aljazeera.com/news/',
         'economics': 'https://www.aljazeera.com/economy/'
+    },
+    'HINDUSTANTIMES':{
+        'sport': 'https://www.hindustantimes.com/sports',
+        'politics': 'https://www.hindustantimes.com/topic/politics',
+        'climate': 'https://www.hindustantimes.com/topic/climate-change',
+        'global affairs': 'https://www.hindustantimes.com/world-news',
+        'economics': 'https://www.hindustantimes.com/topic/economy'
     }
 }
 
@@ -108,7 +115,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             return func
         return decorator
 
-    @action_handler("action3")
+    @action_handler("actionNameHere")
     def perform_actionNumberHere(self):
         print("Performing action 3")
 
@@ -128,6 +135,79 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             print("Request failed with status code", response.status_code)
 
         return article_content, url
+
+    # region Industan Times
+    @action_handler("HINDUSTANTIMES")
+    def perform_action4(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = hindu_times_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = al_jazeera_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = al_jazeera_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = al_jazeera_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = al_jazeera_home_links_economics_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            article_obj = self.hindu_times_sport(url, article_content)
+            if article_obj is not None and len(article_obj['content']) > 0:
+                if isinstance(article_obj, list):
+                    articles = articles + article_obj
+                else:
+                    articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def hindu_times_sport(self, url, article_content):
+        article_obj = {}
+        try:
+            title = article_content.find('h1').get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_content.find(class_="storyBy")
+            if author is None:
+                author = "HINDUSTANTIMES - No Explicit Author - " + self.topic
+            else:
+                author = author.get_text()
+                author = re.sub(r'\s+', ' ', author.strip())
+
+            # Getting first simple date and its last child - this is the better date format
+            time = article_content.find(class_="dateTime secTime storyPage").get_text()
+
+            contents = article_content.find(class_='detail').find_all('p')
+
+            article_text = []
+            for tag in contents:
+                text = tag.get_text()
+                article_text.append(text)
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text)
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+
+    # endregion
 
     # region Al Jazeera
 
