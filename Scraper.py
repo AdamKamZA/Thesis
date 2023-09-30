@@ -4,7 +4,7 @@ import urllib.parse
 import re
 from Outlets.BBC import bbc_home_links_sport_base, bbc_home_links_politics_base, bbc_home_links_climate_base,\
     bbc_home_links_global_affairs_base, bbc_home_links_economics_base
-from Outlets.NEWS24 import news24_home_links_sport_base
+from Outlets.NEWS24 import news24_home_links_sport_base, news24_home_links_politics_base, news24_content
 
 OUTLETS = {
     'BBC': {
@@ -126,8 +126,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         if self.topic == 'sport':
             links = news24_home_links_sport_base(self.content)
         if self.topic == 'politics':
-            # TODO Update to news24
-            links = bbc_home_links_politics_base(self.content)
+            links = news24_home_links_politics_base(self.content)
         if self.topic == 'climate':
             # TODO Update to news24
             links = bbc_home_links_climate_base(self.content)
@@ -142,8 +141,8 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         base_url = OUTLETS[self.action][self.topic]
         for link in links:
             article_content, url = self.make_request(link, base_url)
-            if self.topic == 'sport':
-                article_obj = self.news24_sport(url, article_content)
+            if self.topic in['sport', 'politics']:
+                article_obj = self.news24_sport_politics(url, article_content)
                 if article_obj is not None and len(article_obj['content']) > 0:
                     if isinstance(article_obj, list):
                         articles = articles + article_obj
@@ -157,7 +156,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         print(articles[0:10])
         print(len(articles))
 
-    def news24_sport(self, url, article_content):
+    def news24_sport_politics(self, url, article_content):
         article_obj = {}
         try:
             is_locked = True if article_content.find(class_="article__prime") is not None else False
@@ -171,11 +170,13 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             if author is None:
                 author = "NEWS24 - No Explicit Author - " + self.topic
             else:
-                author = article_content.get_text()
+                author = author.get_text()
+                author = re.sub(r'\s+', ' ', author.strip())
+
             # TODO Convert time to date function
             time = article_content.find(class_="article__date").get_text()
 
-            contents = article_content.find(class_="article__body NewsArticle").find_all(['strong', 'p'])
+            contents = news24_content(article_content)
             # print(content)
             article_text = []
             for tag in contents:
