@@ -8,7 +8,9 @@ from Outlets.NEWS24 import news24_home_links_sport_base, news24_home_links_polit
     news24_home_links_climate_base, news24_home_links_global_affairs_base, news24_home_links_economics_base
 from Outlets.AL_JAZEERA import al_jazeera_home_links_sport_base, al_jazeera_home_links_politics_base, \
     al_jazeera_home_links_climate_base, al_jazeera_home_links_global_affairs_base, al_jazeera_home_links_economics_base
-from Outlets.HINDUSTANTIMES import hindu_times_home_links_sport_base
+from Outlets.HINDUSTANTIMES import hindu_times_home_links_sport_base, hindu_times_home_links_politics_base, \
+    hindu_times_home_links_climate_base, hindu_times_home_links_global_affairs_base, \
+    hindu_times_home_links_economics_base
 
 OUTLETS = {
     'BBC': {
@@ -34,10 +36,17 @@ OUTLETS = {
     },
     'HINDUSTANTIMES':{
         'sport': 'https://www.hindustantimes.com/sports',
-        'politics': 'https://www.hindustantimes.com/topic/politics',
-        'climate': 'https://www.hindustantimes.com/topic/climate-change',
+        'politics': 'https://www.hindustantimes.com/topic/politics/news',
+        'climate': 'https://www.hindustantimes.com/topic/climate-change/news',
         'global affairs': 'https://www.hindustantimes.com/world-news',
-        'economics': 'https://www.hindustantimes.com/topic/economy'
+        'economics': 'https://www.hindustantimes.com/topic/economy/news'
+    },
+    "TIMESOFINDIA":{
+        'sport': 'https://www.hindustantimes.com/sports',
+        'politics': 'https://www.hindustantimes.com/topic/politics/news',
+        'climate': 'https://www.hindustantimes.com/topic/climate-change/news',
+        'global affairs': 'https://www.hindustantimes.com/world-news',
+        'economics': 'https://www.hindustantimes.com/topic/economy/news'
     }
 }
 
@@ -136,7 +145,8 @@ class WebsiteMapper(metaclass=ActionDispatcher):
 
         return article_content, url
 
-    # region Industan Times
+    # region Hindustan Times
+
     @action_handler("HINDUSTANTIMES")
     def perform_action4(self):
         articles = []
@@ -144,19 +154,19 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         if self.topic == 'sport':
             links = hindu_times_home_links_sport_base(self.content)
         if self.topic == 'politics':
-            links = al_jazeera_home_links_politics_base(self.content)
+            links = hindu_times_home_links_politics_base(self.content)
         if self.topic == 'climate':
-            links = al_jazeera_home_links_climate_base(self.content)
+            links = hindu_times_home_links_climate_base(self.content)
         if self.topic == 'global affairs':
-            links = al_jazeera_home_links_global_affairs_base(self.content)
+            links = hindu_times_home_links_global_affairs_base(self.content)
         if self.topic == 'economics':
-            links = al_jazeera_home_links_economics_base(self.content)
+            links = hindu_times_home_links_economics_base(self.content)
 
         # make request to each link and scrape and save content
         base_url = OUTLETS[self.action][self.topic]
         for link in links:
             article_content, url = self.make_request(link, base_url)
-            article_obj = self.hindu_times_sport(url, article_content)
+            article_obj = self.hindu_times_all(url, article_content)
             if article_obj is not None and len(article_obj['content']) > 0:
                 if isinstance(article_obj, list):
                     articles = articles + article_obj
@@ -166,7 +176,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         print(articles[0:10])
         print(len(articles))
 
-    def hindu_times_sport(self, url, article_content):
+    def hindu_times_all(self, url, article_content):
         article_obj = {}
         try:
             title = article_content.find('h1').get_text()
@@ -195,7 +205,8 @@ class WebsiteMapper(metaclass=ActionDispatcher):
                 'title': title,
                 'writer': author,
                 'content': article_text,
-                'publish_time': time
+                'publish_time': time,
+                'link': url
             }
 
         except AttributeError:
@@ -275,7 +286,8 @@ class WebsiteMapper(metaclass=ActionDispatcher):
                 'title': title,
                 'writer': author,
                 'content': article_text,
-                'publish_time': time
+                'publish_time': time,
+                'link': url
             }
 
         except AttributeError:
@@ -353,7 +365,8 @@ class WebsiteMapper(metaclass=ActionDispatcher):
                 'title': title,
                 'writer': author,
                 'content': article_text,
-                'publish_time': time
+                'publish_time': time,
+                'link': url
             }
 
         except AttributeError:
@@ -445,7 +458,8 @@ class WebsiteMapper(metaclass=ActionDispatcher):
                 'title': title,
                 'writer': author,
                 'content': article_text,
-                'publish_time': time
+                'publish_time': time,
+                'link': url
             }
 
         except AttributeError:
@@ -487,7 +501,8 @@ class WebsiteMapper(metaclass=ActionDispatcher):
                 'title': title,
                 'writer': author,
                 'content': article_text,
-                'publish_time': time
+                'publish_time': time,
+                'link': url
             }
 
         except AttributeError:
