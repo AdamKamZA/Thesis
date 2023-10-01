@@ -18,7 +18,7 @@ from Outlets.CNA import cna_home_links_sport_base, cna_home_links_politics_base,
     cna_home_links_global_affairs_base, cna_home_links_economics_base
 from Outlets.CNN import cnn_home_links_sport_base, cnn_home_links_politics_base, cnn_home_links_climate_base, \
     cnn_home_links_global_affairs_base, cnn_home_links_economics_base
-
+from Outlets.YAHOO import yahoo_home_links_sport_base
 
 OUTLETS = {
     'BBC': {
@@ -69,6 +69,13 @@ OUTLETS = {
         'climate': 'https://edition.cnn.com/world/cnn-climate',
         'global affairs': 'https://edition.cnn.com/world',
         'economics': 'https://edition.cnn.com/business'
+    },
+    "YAHOO": {
+        'sport': 'https://sports.yahoo.com/',
+        'politics': 'https://news.yahoo.com/politics/',
+        'climate': 'https://www.yahoo.com/tagged/climate-change',
+        'global affairs': 'https://news.yahoo.com/world/',
+        'economics': 'https://finance.yahoo.com/news/'
     }
 }
 
@@ -168,6 +175,82 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             print("Request failed with status code", response.status_code)
 
         return article_content, url
+
+    # region Yahoo
+
+    @action_handler("YAHOO")
+    def perform_action8(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = yahoo_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = cnn_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = cnn_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = cnn_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = cnn_home_links_economics_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            article_obj = self.yahoo_sport(url, article_content)
+            if article_obj is not None and len(article_obj['content']) > 0:
+                if isinstance(article_obj, list):
+                    articles = articles + article_obj
+                else:
+                    articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def yahoo_sport(self, url, article_content):
+        article_obj = {}
+        try:
+            article_tag = article_content.find('article')
+            title = article_tag.find('h1').get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_tag.find(class_='caas-author-byline-collapse')
+            if author is None:
+                author = "CNN - No Explicit Author - " + self.topic
+            else:
+                author = author.get_text()
+                author = re.sub(r'\s+', ' ', author.strip())
+            # Getting first simple date and its last child - this is the better date format
+            time = article_tag.find('time').get_text()
+            time = re.sub(r'\s+', ' ', time.strip())
+
+            content_container = article_tag.find(class_="caas-body")
+            article_text = []
+            for child in content_container.children:
+                if child.name == 'p' or child.name == 'h2':
+                    article_text.append(child.get_text())
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text.strip())
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time,
+                'link': url
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+
+    # endregion
+
 
     # region The Washington Post
     @action_handler("CNN")
