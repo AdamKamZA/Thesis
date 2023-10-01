@@ -15,7 +15,7 @@ from Outlets.TIMESOFINDIA import times_of_india_home_links_sport_base, times_of_
     times_of_india_home_links_climate_base, times_of_india_home_links_global_affairs_base, \
     times_of_india_home_links_economics_base
 from Outlets.CNA import cna_home_links_sport_base, cna_home_links_politics_base, cna_home_links_climate_base, \
-    cna_home_links_global_affairs_base
+    cna_home_links_global_affairs_base, cna_home_links_economics_base
 
 OUTLETS = {
     'BBC': {
@@ -174,13 +174,13 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         if self.topic == 'global affairs':
             links = cna_home_links_global_affairs_base(self.content)
         if self.topic == 'economics':
-            links = cna_home_links_sport_base(self.content)
+            links = cna_home_links_economics_base(self.content)
 
         # make request to each link and scrape and save content
         base_url = OUTLETS[self.action][self.topic]
         for link in links:
             article_content, url = self.make_request(link, base_url)
-            article_obj = self.cna_sport(url, article_content)
+            article_obj = self.cna_all(url, article_content)
             if article_obj is not None and len(article_obj['content']) > 0:
                 if isinstance(article_obj, list):
                     articles = articles + article_obj
@@ -190,7 +190,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         print(articles[0:10])
         print(len(articles))
 
-    def cna_sport(self, url, article_content):
+    def cna_all(self, url, article_content):
         article_obj = {}
         try:
             title = article_content.find('h1').get_text()
