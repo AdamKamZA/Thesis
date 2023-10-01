@@ -14,6 +14,7 @@ from Outlets.HINDUSTANTIMES import hindu_times_home_links_sport_base, hindu_time
 from Outlets.TIMESOFINDIA import times_of_india_home_links_sport_base, times_of_india_home_links_politics_base, \
     times_of_india_home_links_climate_base, times_of_india_home_links_global_affairs_base, \
     times_of_india_home_links_economics_base
+from Outlets.CNA import cna_home_links_sport_base
 
 OUTLETS = {
     'BBC': {
@@ -50,6 +51,13 @@ OUTLETS = {
         'climate': 'https://timesofindia.indiatimes.com/topic/climate-change/news',
         'global affairs': 'https://timesofindia.indiatimes.com/topic/world-affairs/news',
         'economics': 'https://timesofindia.indiatimes.com/business/economy'
+    },
+    "CNA": {
+        'sport': 'https://www.channelnewsasia.com/sport',
+        'politics': 'https://www.channelnewsasia.com/topic/politics',
+        'climate': 'https://www.channelnewsasia.com/sustainability',
+        'global affairs': 'https://www.channelnewsasia.com/world',
+        'economics': 'https://www.channelnewsasia.com/business'
     }
 }
 
@@ -147,6 +155,82 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             print("Request failed with status code", response.status_code)
 
         return article_content, url
+
+    # region Channel News Asia
+
+    @action_handler("CNA")
+    def perform_action6(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = cna_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = cna_home_links_sport_base(self.content)
+        if self.topic == 'climate':
+            links = cna_home_links_sport_base(self.content)
+        if self.topic == 'global affairs':
+            links = cna_home_links_sport_base(self.content)
+        if self.topic == 'economics':
+            links = cna_home_links_sport_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            article_obj = self.cna_sport(url, article_content)
+            if article_obj is not None and len(article_obj['content']) > 0:
+                if isinstance(article_obj, list):
+                    articles = articles + article_obj
+                else:
+                    articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def cna_sport(self, url, article_content):
+        article_obj = {}
+        try:
+            title = article_content.find('h1').get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_content.find(class_='h6__link')
+            if author is None:
+                author = "CNA - No Explicit Author - " + self.topic
+            else:
+                author = author.get_text()
+                author = re.sub(r'\s+', ' ', author.strip())
+            # Getting first simple date and its last child - this is the better date format
+            time = article_content.select_one('.article-publish.article-publish--').get_text()
+            time = re.sub(r'\s+', ' ', time.strip())
+
+            content = article_content.find_all(class_="text")
+            text_blocks = []
+            for tag in content:
+                text_blocks = text_blocks + tag.find_all('p')
+
+            article_text = []
+            for block in text_blocks:
+                article_text.append(block.get_text())
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text.strip())
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time,
+                'link': url
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+    # endregion
 
     # region Times of India
 
