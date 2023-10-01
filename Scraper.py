@@ -20,6 +20,9 @@ from Outlets.CNN import cnn_home_links_sport_base, cnn_home_links_politics_base,
     cnn_home_links_global_affairs_base, cnn_home_links_economics_base
 from Outlets.YAHOO import yahoo_home_links_sport_base, yahoo_home_links_politics_base, yahoo_home_links_climate_base, \
     yahoo_home_links_global_affairs_base, yahoo_home_links_economics_base
+from Outlets.REUTERS import reuters_home_links_sport_base, reuters_home_links_climate_base, \
+    reuters_home_links_global_affairs_base, reuters_home_links_economics_base
+
 
 OUTLETS = {
     'BBC': {
@@ -77,6 +80,13 @@ OUTLETS = {
         'climate': 'https://www.yahoo.com/tagged/climate-change',
         'global affairs': 'https://news.yahoo.com/world/',
         'economics': 'https://finance.yahoo.com/news/'
+    },
+    "REUTERS": {
+        'sport': 'https://www.reuters.com/sports/',
+        'politics': 'https://www.reuters.com/news/archive/politicsNews?view=page&page=2&pageSize=10',
+        'climate': 'https://reuters.com/business/environment/',
+        'global affairs': 'https://www.reuters.com/world/',
+        'economics': 'https://www.reuters.com/markets/'
     }
 }
 
@@ -177,6 +187,76 @@ class WebsiteMapper(metaclass=ActionDispatcher):
 
         return article_content, url
 
+    @action_handler("REUTERS")
+    def perform_action9(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = reuters_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = yahoo_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = reuters_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = reuters_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = reuters_home_links_economics_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            article_obj = self.reuters_sport(url, article_content)
+            if article_obj is not None and len(article_obj['content']) > 0:
+                if isinstance(article_obj, list):
+                    articles = articles + article_obj
+                else:
+                    articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def reuters_sport(self, url, article_content):
+        article_obj = {}
+        try:
+            article_tag = article_content.find('article')
+            title = article_tag.find('h1').get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_tag.find_all('a', attrs={"rel":"author"})
+            if author is None or len(author) == 0:
+                author = "REUTERS - No Explicit Author - " + self.topic
+            else:
+                author = author[0].get_text()
+                author = re.sub(r'\s+', ' ', author.strip())
+            # Getting first simple date and its last child - this is the better date format
+            time = article_tag.find('time').get_text()
+            time = re.sub(r'\s+', ' ', time.strip())
+
+            content = article_tag.find(class_="article-body__content__17Yit").find_all('p')
+            article_text = []
+            for tag in content:
+                article_text.append(tag.get_text())
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text.strip())
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time,
+                'link': url
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+
     # region Yahoo
 
     @action_handler("YAHOO")
@@ -252,8 +332,8 @@ class WebsiteMapper(metaclass=ActionDispatcher):
 
     # endregion
 
-
     # region The Washington Post
+
     @action_handler("CNN")
     def peform_action7(self):
         articles = []
