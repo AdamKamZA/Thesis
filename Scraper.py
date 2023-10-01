@@ -18,7 +18,8 @@ from Outlets.CNA import cna_home_links_sport_base, cna_home_links_politics_base,
     cna_home_links_global_affairs_base, cna_home_links_economics_base
 from Outlets.CNN import cnn_home_links_sport_base, cnn_home_links_politics_base, cnn_home_links_climate_base, \
     cnn_home_links_global_affairs_base, cnn_home_links_economics_base
-from Outlets.YAHOO import yahoo_home_links_sport_base
+from Outlets.YAHOO import yahoo_home_links_sport_base, yahoo_home_links_politics_base, yahoo_home_links_climate_base, \
+    yahoo_home_links_global_affairs_base, yahoo_home_links_economics_base
 
 OUTLETS = {
     'BBC': {
@@ -185,13 +186,13 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         if self.topic == 'sport':
             links = yahoo_home_links_sport_base(self.content)
         if self.topic == 'politics':
-            links = cnn_home_links_politics_base(self.content)
+            links = yahoo_home_links_politics_base(self.content)
         if self.topic == 'climate':
-            links = cnn_home_links_climate_base(self.content)
+            links = yahoo_home_links_climate_base(self.content)
         if self.topic == 'global affairs':
-            links = cnn_home_links_global_affairs_base(self.content)
+            links = yahoo_home_links_global_affairs_base(self.content)
         if self.topic == 'economics':
-            links = cnn_home_links_economics_base(self.content)
+            links = yahoo_home_links_economics_base(self.content)
 
         # make request to each link and scrape and save content
         base_url = OUTLETS[self.action][self.topic]
