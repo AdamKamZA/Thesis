@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import urllib.parse
 import re
-from Outlets.BBC import bbc_home_links_sport_base, bbc_home_links_politics_base, bbc_home_links_climate_base,\
+from Outlets.BBC import bbc_home_links_sport_base, bbc_home_links_politics_base, bbc_home_links_climate_base, \
     bbc_home_links_global_affairs_base, bbc_home_links_economics_base
 from Outlets.NEWS24 import news24_home_links_sport_base, news24_home_links_politics_base, news24_content, \
     news24_home_links_climate_base, news24_home_links_global_affairs_base, news24_home_links_economics_base
@@ -14,7 +14,8 @@ from Outlets.HINDUSTANTIMES import hindu_times_home_links_sport_base, hindu_time
 from Outlets.TIMESOFINDIA import times_of_india_home_links_sport_base, times_of_india_home_links_politics_base, \
     times_of_india_home_links_climate_base, times_of_india_home_links_global_affairs_base, \
     times_of_india_home_links_economics_base
-from Outlets.CNA import cna_home_links_sport_base
+from Outlets.CNA import cna_home_links_sport_base, cna_home_links_politics_base, cna_home_links_climate_base, \
+    cna_home_links_global_affairs_base
 
 OUTLETS = {
     'BBC': {
@@ -74,9 +75,10 @@ BBC_SPORT = [
     "cycling"
 ]
 
-
 HEADER = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-                                      "Chrome/88.0.4324.150 Safari/537.36"}
+                        "Chrome/88.0.4324.150 Safari/537.36"}
+
+
 class Scraper:
     def __init__(self, outlet, topic):
         self.outlet = outlet
@@ -133,6 +135,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         def decorator(func):
             setattr(func, "action_name", action_name)
             return func
+
         return decorator
 
     @action_handler("actionNameHere")
@@ -165,11 +168,11 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         if self.topic == 'sport':
             links = cna_home_links_sport_base(self.content)
         if self.topic == 'politics':
-            links = cna_home_links_sport_base(self.content)
+            links = cna_home_links_politics_base(self.content)
         if self.topic == 'climate':
-            links = cna_home_links_sport_base(self.content)
+            links = cna_home_links_climate_base(self.content)
         if self.topic == 'global affairs':
-            links = cna_home_links_sport_base(self.content)
+            links = cna_home_links_global_affairs_base(self.content)
         if self.topic == 'economics':
             links = cna_home_links_sport_base(self.content)
 
@@ -192,7 +195,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         try:
             title = article_content.find('h1').get_text()
             title = re.sub(r'\s+', ' ', title.strip())
-            author = article_content.find(class_='h6__link')
+            author = article_content.find(class_='h6 h6--author-name')
             if author is None:
                 author = "CNA - No Explicit Author - " + self.topic
             else:
@@ -230,6 +233,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             return None
 
         return article_obj
+
     # endregion
 
     # region Times of India
@@ -278,7 +282,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             # Getting first simple date and its last child - this is the better date format
             time = header_content.find('span').get_text()
 
-            article_with_extras = article_content.find('div', attrs={'data-articlebody': '1'}).\
+            article_with_extras = article_content.find('div', attrs={'data-articlebody': '1'}). \
                 find_all('div', recursive=False)[-1]
             divs_to_remove = article_with_extras.find_all('div')
 
@@ -410,7 +414,6 @@ class WebsiteMapper(metaclass=ActionDispatcher):
                 else:
                     articles.append(article_obj)
 
-
         print(articles[0:10])
         print(len(articles))
 
@@ -460,6 +463,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             return None
 
         return article_obj
+
     # endregion
 
     # region NEWS24
@@ -582,7 +586,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         article_obj = {}
         # Single recursive layer to check other sport home pages
         if not nested:
-            article_rec_array=[]
+            article_rec_array = []
             # get last route value to see if its a base page
             final_route = url.split('/')[-1]
             if final_route in BBC_SPORT:
@@ -676,4 +680,3 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         return article_obj
 
     # endregion
-
