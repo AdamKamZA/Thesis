@@ -12,6 +12,7 @@ def reuters_home_links_sport_base(content):
 
 # politics can select several pages for the link, so the request in this function can be for the base page
 # then the next 75 to get 750
+# TODO: The politics, which requires a different approach
 
 
 def reuters_home_links_climate_base(content):
