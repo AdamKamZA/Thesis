@@ -24,6 +24,8 @@ from Outlets.REUTERS import reuters_home_links_sport_base, reuters_home_links_cl
     reuters_home_links_global_affairs_base, reuters_home_links_economics_base
 from Outlets.THEGUARDIAN import guardian_home_links_sport_base, guardian_home_links_politics_base, \
     guardian_home_links_climate_base, guardian_home_links_global_affairs_base, guardian_home_links_economics_base
+from Outlets.THESUN import the_sun_home_links_sport_base, the_sun_home_links_politics_base, \
+    the_sun_home_links_climate_base, the_sun_home_links_global_affairs_base, the_sun_home_links_economics_base
 
 OUTLETS = {
     'BBC': {
@@ -95,6 +97,13 @@ OUTLETS = {
         'climate': 'https://www.theguardian.com/environment/climate-crisis',
         'global affairs': 'https://www.theguardian.com/world/all',
         'economics': 'https://www.theguardian.com/business/economics'
+    },
+    "SUN": {
+        'sport': 'https://www.thesun.co.uk/sport/',
+        'politics': 'https://www.thesun.co.uk/news/politics/',
+        'climate': 'https://www.thesun.co.uk/topic/climate-change-environment/',
+        'global affairs': 'https://www.thesun.co.uk/news/worldnews/',
+        'economics': 'https://www.thesun.co.uk/money/business/'
     }
 }
 
@@ -195,6 +204,80 @@ class WebsiteMapper(metaclass=ActionDispatcher):
 
         return article_content, url
 
+    # region The Sun
+
+    @action_handler("SUN")
+    def perform_action11(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = the_sun_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = the_sun_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = the_sun_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = the_sun_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = the_sun_home_links_economics_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            article_obj = self.the_sun_all(url, article_content)
+            if article_obj is not None and len(article_obj['content']) > 0:
+                if isinstance(article_obj, list):
+                    articles = articles + article_obj
+                else:
+                    articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def the_sun_all(self, url, article_content):
+        article_obj = {}
+        try:
+            title = article_content.find(class_='article__headline').get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_content.find_all('a', attrs={"rel": "author"})
+            if author is None or len(author) == 0:
+                author = "THE GUARDIAN - No Explicit Author - " + self.topic
+            else:
+                author = author[0].get_text()
+                author = re.sub(r'\s+', ' ', author.strip())
+            # Getting first simple date and its last child - this is the better date format
+            time = article_content.find(class_='article__timestamp').get_text()
+            time = re.sub(r'\s+', ' ', time.strip())
+
+            content = article_content.find(class_="article__content")
+            article_text = []
+            for tag in content.children:
+                if tag.name == 'p' or tag.name == 'h2':
+                    article_text.append(tag.get_text())
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text.strip())
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time,
+                'link': url
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+
+    # endregion
+
     # region The Guardian
 
     @action_handler("GUARDIAN")
@@ -267,6 +350,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             return None
 
         return article_obj
+
     # endregion
 
     # region Reuters
