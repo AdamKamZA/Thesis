@@ -29,6 +29,8 @@ from Outlets.THESUN import the_sun_home_links_sport_base, the_sun_home_links_pol
 from Outlets.THETELEGRAPH import the_telegraph_home_links_sport_base, the_telegraph_home_links_politics_base, \
     the_telegraph_home_links_climate_base, the_telegraph_home_links_global_affairs_base, \
     the_telegraph_home_links_economics_base
+from Outlets.NEWSAU import news_au_home_links_sport_base, news_au_home_links_politics_base, \
+    news_au_home_links_climate_base, news_au_home_links_global_affairs_base, news_au_home_links_economics_base
 
 
 OUTLETS = {
@@ -115,6 +117,13 @@ OUTLETS = {
         'climate': 'https://www.telegraph.co.uk/climate-change/',
         'global affairs': 'https://www.telegraph.co.uk/foreign-commonwealth-office/',
         'economics': 'https://www.telegraph.co.uk/business/economy/'
+    },
+    "NEWSAU": {
+        'sport': 'https://www.news.com.au/sport',
+        'politics': 'https://www.news.com.au/national/politics',
+        'climate': 'https://www.news.com.au/technology/environment/climate-change',
+        'global affairs': 'https://www.news.com.au/world',
+        'economics': 'https://www.news.com.au/finance/economy'
     }
 }
 
@@ -214,6 +223,80 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             print("Request failed with status code", response.status_code)
 
         return article_content, url
+
+    # region News.com.au
+
+    @action_handler("NEWSAU")
+    def perform_action13(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = news_au_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = news_au_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = news_au_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = news_au_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = news_au_home_links_economics_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            article_obj = self.news_au_all(url, article_content)
+            if article_obj is not None and len(article_obj['content']) > 0:
+                if isinstance(article_obj, list):
+                    articles = articles + article_obj
+                else:
+                    articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def news_au_all(self, url, article_content):
+        article_obj = {}
+        try:
+            article_tag = article_content.find('article')
+            title = article_tag.find('h1').get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_tag.find(class_='author_name')
+            if author is None or len(author) == 0:
+                author = "NEWSAU - No Explicit Author - " + self.topic
+            else:
+                author = author.get_text()
+                author = re.sub(r'\s+', ' ', author.strip())
+            # Getting first simple date and its last child - this is the better date format
+            time = article_tag.find(id='publish-date').get_text()
+            time = re.sub(r'\s+', ' ', time.strip())
+
+            content = article_tag.find(id="story-primary").find_all('p')
+            article_text = []
+            for p in content:
+                article_text.append(p.get_text())
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text.strip())
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time,
+                'link': url
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+
+    # endregion
 
     # region The Telegraph
 
