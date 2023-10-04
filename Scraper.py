@@ -35,7 +35,8 @@ from Outlets.ABCNET import abc_net_home_links_sport_base, abc_net_home_links_pol
     abc_net_home_links_climate_base, abc_net_home_links_global_affairs_base, abc_net_home_links_economics_base
 from Outlets.NINENEWS import nine_news_home_links_sport_base, nine_news_home_links_politics_base, \
     nine_news_home_links_climate_base, nine_news_home_links_global_affairs_base, nine_news_home_links_economics_base
-
+from Outlets.STUFFNZ import stuff_home_links_sport_base, stuff_home_links_politics_base, \
+    stuff_home_links_climate_base, stuff_home_links_global_affairs_base, stuff_home_links_economics_base
 
 OUTLETS = {
     'BBC': {
@@ -142,6 +143,13 @@ OUTLETS = {
         'climate': 'https://www.9news.com.au/climate-change',
         'global affairs': 'https://www.9news.com.au/world',
         'economics': 'https://www.9news.com.au/economy'
+    },
+    "STUFF": {
+        'sport': 'https://www.stuff.co.nz/sport',
+        'politics': 'https://www.stuff.co.nz/national/politics/more_headlines',
+        'climate': 'https://www.stuff.co.nz/environment',
+        'global affairs': 'https://www.stuff.co.nz/world',
+        'economics': 'https://www.stuff.co.nz/world/economist'
     }
 }
 
@@ -242,6 +250,80 @@ class WebsiteMapper(metaclass=ActionDispatcher):
 
         return article_content, url
 
+
+    @action_handler("STUFF")
+    def perform_action16(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = stuff_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = stuff_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = stuff_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = stuff_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = stuff_home_links_economics_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            article_obj = self.stuff_au_all(url, article_content)
+            if article_obj is not None and len(article_obj['content']) > 0:
+                if isinstance(article_obj, list):
+                    articles = articles + article_obj
+                else:
+                    articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def stuff_au_all(self, url, article_content):
+        article_obj = {}
+        try:
+            article_tag = article_content.find(class_='sics-component__app__main')
+            title = article_tag.find(class_='sics-component__headline__title').get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_tag.find(class_="sics-component__byline__author")
+            if author is None or len(author) == 0:
+                author = "ABCNET - No Explicit Author - " + self.topic
+            else:
+                author = author.get_text()
+                author = re.sub(r'\s+', ' ', author.strip())
+
+            time = article_tag.find(class_='sics-component__byline__date').get('content')
+            time = re.sub(r'\s+', ' ', time.strip())
+
+            # double div child containers
+            content_container = article_tag.find(class_="sics-component__story__body sics-component__story__body"
+                                                            "--nativform").find_all('p')
+            article_text = []
+            for tag in content_container:
+                article_text.append(tag.get_text())
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text.strip())
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time,
+                'link': url
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+
+
     # region 9NEWS
 
     @action_handler("NINENEWS")
@@ -315,7 +397,6 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             return None
 
         return article_obj
-
 
     # endregion
 
