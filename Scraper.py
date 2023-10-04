@@ -31,7 +31,8 @@ from Outlets.THETELEGRAPH import the_telegraph_home_links_sport_base, the_telegr
     the_telegraph_home_links_economics_base
 from Outlets.NEWSAU import news_au_home_links_sport_base, news_au_home_links_politics_base, \
     news_au_home_links_climate_base, news_au_home_links_global_affairs_base, news_au_home_links_economics_base
-from Outlets.ABCNET import abc_net_home_links_sport_base
+from Outlets.ABCNET import abc_net_home_links_sport_base, abc_net_home_links_politics_base, \
+    abc_net_home_links_climate_base, abc_net_home_links_global_affairs_base, abc_net_home_links_economics_base
 
 OUTLETS = {
     'BBC': {
@@ -130,7 +131,7 @@ OUTLETS = {
         'politics': 'https://www.abc.net.au/news/politics',
         'climate': 'https://www.abc.net.au/news/topic/climate-change',
         'global affairs': 'https://www.abc.net.au/news/world',
-        'economics': 'https://www.abc.net.au/news/topic/business-economics-and-finance'
+        'economics': 'https://www.abc.net.au/news/business'
     }
 }
 
@@ -240,13 +241,13 @@ class WebsiteMapper(metaclass=ActionDispatcher):
         if self.topic == 'sport':
             links = abc_net_home_links_sport_base(self.content)
         if self.topic == 'politics':
-            links = news_au_home_links_politics_base(self.content)
+            links = abc_net_home_links_politics_base(self.content)
         if self.topic == 'climate':
-            links = news_au_home_links_climate_base(self.content)
+            links = abc_net_home_links_climate_base(self.content)
         if self.topic == 'global affairs':
-            links = news_au_home_links_global_affairs_base(self.content)
+            links = abc_net_home_links_global_affairs_base(self.content)
         if self.topic == 'economics':
-            links = news_au_home_links_economics_base(self.content)
+            links = abc_net_home_links_economics_base(self.content)
 
         # make request to each link and scrape and save content
         base_url = OUTLETS[self.action][self.topic]
