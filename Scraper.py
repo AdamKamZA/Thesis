@@ -31,7 +31,7 @@ from Outlets.THETELEGRAPH import the_telegraph_home_links_sport_base, the_telegr
     the_telegraph_home_links_economics_base
 from Outlets.NEWSAU import news_au_home_links_sport_base, news_au_home_links_politics_base, \
     news_au_home_links_climate_base, news_au_home_links_global_affairs_base, news_au_home_links_economics_base
-
+from Outlets.ABCNET import abc_net_home_links_sport_base
 
 OUTLETS = {
     'BBC': {
@@ -124,6 +124,13 @@ OUTLETS = {
         'climate': 'https://www.news.com.au/technology/environment/climate-change',
         'global affairs': 'https://www.news.com.au/world',
         'economics': 'https://www.news.com.au/finance/economy'
+    },
+    "ABCNET": {
+        'sport': 'https://www.abc.net.au/news/sport',
+        'politics': 'https://www.abc.net.au/news/politics',
+        'climate': 'https://www.abc.net.au/news/topic/climate-change',
+        'global affairs': 'https://www.abc.net.au/news/world',
+        'economics': 'https://www.abc.net.au/news/topic/business-economics-and-finance'
     }
 }
 
@@ -223,6 +230,85 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             print("Request failed with status code", response.status_code)
 
         return article_content, url
+
+    # region ABC NET AU
+
+    @action_handler("ABCNET")
+    def perform_action14(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = abc_net_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = news_au_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = news_au_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = news_au_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = news_au_home_links_economics_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            article_obj = self.abc_net_au_all(url, article_content)
+            if article_obj is not None and len(article_obj['content']) > 0:
+                if isinstance(article_obj, list):
+                    articles = articles + article_obj
+                else:
+                    articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def abc_net_au_all(self, url, article_content):
+        article_obj = {}
+        try:
+            article_tag = article_content.find('article')
+            title = " ".join(article_tag.find('h1').find_all(text=True, recursive=False))
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_tag.find_all('span', attrs={"data-attribute": "Byline"})
+            if author is None or len(author) == 0:
+                author = "ABCNET - No Explicit Author - " + self.topic
+            else:
+                author = author[0].find('a').get_text()
+                author = re.sub(r'\s+', ' ', author.strip())
+            # Getting first simple date and its last child - this is the better date format
+            time = article_tag.find_all('div', attrs={"data-component": "Dateline"})[0].\
+                find_all('time', attrs={"data-component": "Timestamp"})
+            time = " ".join([t.get('datetime') for t in time])
+            time = re.sub(r'\s+', ' ', time.strip())
+
+            # double div child containers
+            content_container = article_tag.find(class_="LayoutContainer_container__O1X6V Article_body__W1ljI").\
+                find('div').find('div')
+            article_text = []
+            for tag in content_container.children:
+                if tag.name == 'p' or tag.name == 'h2':
+                    article_text.append(tag.get_text())
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text.strip())
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time,
+                'link': url
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+
+    # endregion
 
     # region News.com.au
 
