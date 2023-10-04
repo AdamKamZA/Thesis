@@ -33,6 +33,9 @@ from Outlets.NEWSAU import news_au_home_links_sport_base, news_au_home_links_pol
     news_au_home_links_climate_base, news_au_home_links_global_affairs_base, news_au_home_links_economics_base
 from Outlets.ABCNET import abc_net_home_links_sport_base, abc_net_home_links_politics_base, \
     abc_net_home_links_climate_base, abc_net_home_links_global_affairs_base, abc_net_home_links_economics_base
+from Outlets.NINENEWS import nine_news_home_links_sport_base, nine_news_home_links_politics_base, \
+    nine_news_home_links_climate_base, nine_news_home_links_global_affairs_base, nine_news_home_links_economics_base
+
 
 OUTLETS = {
     'BBC': {
@@ -132,6 +135,13 @@ OUTLETS = {
         'climate': 'https://www.abc.net.au/news/topic/climate-change',
         'global affairs': 'https://www.abc.net.au/news/world',
         'economics': 'https://www.abc.net.au/news/business'
+    },
+    "NINENEWS": {
+        'sport': 'https://www.9news.com.au/sport',
+        'politics': 'https://www.9news.com.au/politics',
+        'climate': 'https://www.9news.com.au/climate-change',
+        'global affairs': 'https://www.9news.com.au/world',
+        'economics': 'https://www.9news.com.au/economy'
     }
 }
 
@@ -231,6 +241,83 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             print("Request failed with status code", response.status_code)
 
         return article_content, url
+
+    # region 9NEWS
+
+    @action_handler("NINENEWS")
+    def perform_action15(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = nine_news_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = nine_news_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = nine_news_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = nine_news_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = nine_news_home_links_economics_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            article_obj = self.nine_news_au_all(url, article_content)
+            if article_obj is not None and len(article_obj['content']) > 0:
+                if isinstance(article_obj, list):
+                    articles = articles + article_obj
+                else:
+                    articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def nine_news_au_all(self, url, article_content):
+        article_obj = {}
+        try:
+            article_tag = article_content.find('article')
+            title = article_tag.find(class_='article__headline').get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_tag.find(class_="text--author")
+            if author is None or len(author) == 0:
+                author = "ABCNET - No Explicit Author - " + self.topic
+            else:
+                author = author.get_text()
+                author = author.replace('By', '')
+                author = re.sub(r'\s+', ' ', author.strip())
+
+            time = article_tag.find('time').get_text()
+            time = re.sub(r'\s+', ' ', time.strip())
+
+            # double div child containers
+            content_container = article_tag.find_all(class_="block-content")
+            article_text = []
+            for tag in content_container:
+                article_text.append(tag.get_text())
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text.strip())
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time,
+                'link': url
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+
+
+    # endregion
 
     # region ABC NET AU
 
