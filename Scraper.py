@@ -26,9 +26,9 @@ from Outlets.THEGUARDIAN import guardian_home_links_sport_base, guardian_home_li
     guardian_home_links_climate_base, guardian_home_links_global_affairs_base, guardian_home_links_economics_base
 from Outlets.THESUN import the_sun_home_links_sport_base, the_sun_home_links_politics_base, \
     the_sun_home_links_climate_base, the_sun_home_links_global_affairs_base, the_sun_home_links_economics_base
-from Outlets.THETELEGRAPH import the_telegraph_home_links_sport_base, the_telegraph_home_links_politics_base, \
-    the_telegraph_home_links_climate_base, the_telegraph_home_links_global_affairs_base, \
-    the_telegraph_home_links_economics_base
+from Outlets.MSN import msn_home_links_sport_base, msn_home_links_politics_base, \
+    msn_home_links_climate_base, msn_home_links_global_affairs_base, \
+    msn_home_links_economics_base
 from Outlets.NEWSAU import news_au_home_links_sport_base, news_au_home_links_politics_base, \
     news_au_home_links_climate_base, news_au_home_links_global_affairs_base, news_au_home_links_economics_base
 from Outlets.ABCNET import abc_net_home_links_sport_base, abc_net_home_links_politics_base, \
@@ -37,6 +37,9 @@ from Outlets.NINENEWS import nine_news_home_links_sport_base, nine_news_home_lin
     nine_news_home_links_climate_base, nine_news_home_links_global_affairs_base, nine_news_home_links_economics_base
 from Outlets.STUFFNZ import stuff_home_links_sport_base, stuff_home_links_politics_base, \
     stuff_home_links_climate_base, stuff_home_links_global_affairs_base, stuff_home_links_economics_base
+from Outlets.SKYNEWS import sky_news_home_links_sport_base, sky_news_sport_sub_links, sky_news_home_links_politics_base, \
+    sky_news_home_links_climate_base, sky_news_home_links_global_affairs_base, sky_news_home_links_economics_base
+
 
 OUTLETS = {
     'BBC': {
@@ -116,12 +119,12 @@ OUTLETS = {
         'global affairs': 'https://www.thesun.co.uk/news/worldnews/',
         'economics': 'https://www.thesun.co.uk/money/business/'
     },
-    "TELEGRAPH": {
-        'sport': 'https://www.telegraph.co.uk/sport/',
-        'politics': 'https://www.telegraph.co.uk/politics/',
-        'climate': 'https://www.telegraph.co.uk/climate-change/',
-        'global affairs': 'https://www.telegraph.co.uk/foreign-commonwealth-office/',
-        'economics': 'https://www.telegraph.co.uk/business/economy/'
+    "MSN": {
+        'sport': 'https://www.msn.com/en-us/sports',
+        'politics': 'https://www.msn.com/en-us/news/politics',
+        'climate': 'https://www.msn.com/en-us/news/topic/global%20warming',
+        'global affairs': 'https://www.msn.com/en-us/news/world',
+        'economics': 'https://www.msn.com/en-us//money'
     },
     "NEWSAU": {
         'sport': 'https://www.news.com.au/sport',
@@ -150,6 +153,13 @@ OUTLETS = {
         'climate': 'https://www.stuff.co.nz/environment',
         'global affairs': 'https://www.stuff.co.nz/world',
         'economics': 'https://www.stuff.co.nz/world/economist'
+    },
+    "SKYNEWS": {
+        'sport': 'https://www.skysports.com/',
+        'politics': 'https://news.sky.com/politics',
+        'climate': 'https://news.sky.com/climate',
+        'global affairs': 'https://news.sky.com/world',
+        'economics': 'https://news.sky.com/business'
     }
 }
 
@@ -164,6 +174,23 @@ BBC_SPORT = [
     "tennis",
     "athletics",
     "cycling"
+]
+
+SKY_SPORT = [
+    "football",
+    "f1",
+    "golf",
+    "cricket",
+    "rugby-league",
+    "rugby-union",
+    "boxing",
+    "tennis",
+    "nfl",
+    "racing",
+    "nba",
+    "netball",
+    "mma",
+    "darts"
 ]
 
 HEADER = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -250,6 +277,230 @@ class WebsiteMapper(metaclass=ActionDispatcher):
 
         return article_content, url
 
+    # region Sky News
+
+    @action_handler('SKYNEWS')
+    def perform_action17(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = sky_news_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = sky_news_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = sky_news_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = sky_news_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = sky_news_home_links_economics_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            route = link.split('/')[-1]
+            if self.topic == 'sport':
+                if route in SKY_SPORT:
+                    # get links for that page
+                    print("-- Sub link content --")
+                    print(link)
+                    sub_article_content, sub_url = self.make_request(link, base_url)
+                    sub_links = sky_news_sport_sub_links(sub_article_content)
+                    for sub_link in sub_links:
+                        sub_article_content_page, sub_url_page = self.make_request(sub_link, base_url)
+                        article_obj = self.sky_news_sport(sub_url_page, sub_article_content_page)
+                        if article_obj is not None and len(article_obj['content']) > 0:
+                            if isinstance(article_obj, list):
+                                articles = articles + article_obj
+                            else:
+                                articles.append(article_obj)
+                    print('-- End of Sub Links --')
+                else:
+                    article_content, url = self.make_request(link, base_url)
+                    article_obj = self.sky_news_sport(url, article_content)
+
+                    if article_obj is not None and len(article_obj['content']) > 0:
+                        if isinstance(article_obj, list):
+                            articles = articles + article_obj
+                        else:
+                            articles.append(article_obj)
+            else:
+                article_content, url = self.make_request(link, base_url)
+                article_obj = self.sky_news_all(url, article_content)
+
+                if article_obj is not None and len(article_obj['content']) > 0:
+                    if isinstance(article_obj, list):
+                        articles = articles + article_obj
+                    else:
+                        articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def sky_news_sport(self, url, article_content):
+        article_obj = {}
+        try:
+            title = article_content.find(class_=['sdc-article-header__long-title', 'article__long-title']).get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_content.find('sdc-article-author__name')
+            if author is None or len(author) == 0:
+                author = "SKYNEWS - No Explicit Author - " + self.topic
+            else:
+                author = author.get_text()
+                author = re.sub(r'\s+', ' ', author.strip())
+
+            time = article_content.find(class_=['article__header-date-time', 'sdc-article-date__date-time']).get_text()
+            time = re.sub(r'\s+', ' ', time.strip())
+
+            content = article_content.find(class_=["sdc-article-body sdc-article-body--lead",
+                                                   "article__body article__body--lead"])
+
+            article_text = []
+            for tag in content.children:
+                if tag.name == 'p':
+                    article_text.append(tag.get_text())
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text.strip())
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time,
+                'link': url
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+
+    def sky_news_all(self, url, article_content):
+        article_obj = {}
+        try:
+            title = article_content.find(class_=['sdc-article-header__long-title', 'article__long-title']).get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_content.find('sdc-article-author__name')
+            if author is None or len(author) == 0:
+                author = "SKYNEWS - No Explicit Author - " + self.topic
+            else:
+                author = author.get_text()
+                author = re.sub(r'\s+', ' ', author.strip())
+
+            time = article_content.find(class_=['article__header-date-time', 'sdc-article-date__date-time']).get_text()
+            time = re.sub(r'\s+', ' ', time.strip())
+
+            content = article_content.find(class_=["sdc-article-body sdc-article-body--lead",
+                                                   "article__body article__body--lead",
+                                                   "sdc-article-body sdc-article-body--story sdc-article-body--lead"])
+
+            article_text = []
+            for tag in content.children:
+                if tag.name == 'p':
+                    article_text.append(tag.get_text())
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text.strip())
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time,
+                'link': url
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+
+    # endregion
+
+    # region The MSN.com
+
+    @action_handler('MSN')
+    def perform_action12(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = msn_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = msn_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = msn_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = msn_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = msn_home_links_economics_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            article_obj = self.msn_all(url, article_content)
+            if article_obj is not None and len(article_obj['content']) > 0:
+                if isinstance(article_obj, list):
+                    articles = articles + article_obj
+                else:
+                    articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def msn_all(self, url, article_content):
+        article_obj = {}
+        try:
+            article_tag = article_content.find('article')
+            title = article_tag.find('h1').get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_tag.find_all('a', attrs={"rel": "author"})
+            if author is None or len(author) == 0:
+                author = "MSN - No Explicit Author - " + self.topic
+            else:
+                author = " ".join([a.get_text() for a in author])
+                author = re.sub(r'\s+', ' ', author.strip())
+            # Getting first simple date and its last child - this is the better date format
+            time = article_tag.find('time').get('datetime')
+            time = re.sub(r'\s+', ' ', time.strip())
+
+            content = article_tag.find(class_="component article-body-text")
+            article_text = []
+            for tag in content.children:
+                if tag.name == 'p' or tag.name == 'h2':
+                    article_text.append(tag.get_text())
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text.strip())
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time,
+                'link': url
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+
+    # endregion
+
+    # region STUFF.co.nz
 
     @action_handler("STUFF")
     def perform_action16(self):
@@ -323,6 +574,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
 
         return article_obj
 
+    # endregion
 
     # region 9NEWS
 
@@ -530,81 +782,6 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             article_text = []
             for p in content:
                 article_text.append(p.get_text())
-
-            article_text = " ".join(article_text)
-            article_text = re.sub(r'\s+', ' ', article_text.strip())
-
-            article_obj = {
-                'title': title,
-                'writer': author,
-                'content': article_text,
-                'publish_time': time,
-                'link': url
-            }
-
-        except AttributeError:
-            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
-            return None
-        except IndexError:
-            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
-            return None
-
-        return article_obj
-
-    # endregion
-
-    # region The Telegraph
-
-    @action_handler('TELEGRAPH')
-    def perform_action12(self):
-        articles = []
-        links = []
-        if self.topic == 'sport':
-            links = the_telegraph_home_links_sport_base(self.content)
-        if self.topic == 'politics':
-            links = the_telegraph_home_links_politics_base(self.content)
-        if self.topic == 'climate':
-            links = the_telegraph_home_links_climate_base(self.content)
-        if self.topic == 'global affairs':
-            links = the_telegraph_home_links_global_affairs_base(self.content)
-        if self.topic == 'economics':
-            links = the_telegraph_home_links_economics_base(self.content)
-
-        # make request to each link and scrape and save content
-        base_url = OUTLETS[self.action][self.topic]
-        for link in links:
-            article_content, url = self.make_request(link, base_url)
-            article_obj = self.the_telegraph_all(url, article_content)
-            if article_obj is not None and len(article_obj['content']) > 0:
-                if isinstance(article_obj, list):
-                    articles = articles + article_obj
-                else:
-                    articles.append(article_obj)
-
-        print(articles[0:10])
-        print(len(articles))
-
-    def the_telegraph_all(self, url, article_content):
-        article_obj = {}
-        try:
-            article_tag = article_content.find('article')
-            title = article_tag.find('h1').get_text()
-            title = re.sub(r'\s+', ' ', title.strip())
-            author = article_tag.find_all('a', attrs={"rel": "author"})
-            if author is None or len(author) == 0:
-                author = "THE TELEGRAPH - No Explicit Author - " + self.topic
-            else:
-                author = " ".join([a.get_text() for a in author])
-                author = re.sub(r'\s+', ' ', author.strip())
-            # Getting first simple date and its last child - this is the better date format
-            time = article_tag.find('time').get('datetime')
-            time = re.sub(r'\s+', ' ', time.strip())
-
-            content = article_tag.find(class_="component article-body-text")
-            article_text = []
-            for tag in content.children:
-                if tag.name == 'p' or tag.name == 'h2':
-                    article_text.append(tag.get_text())
 
             article_text = " ".join(article_text)
             article_text = re.sub(r'\s+', ' ', article_text.strip())
