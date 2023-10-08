@@ -39,7 +39,8 @@ from Outlets.STUFFNZ import stuff_home_links_sport_base, stuff_home_links_politi
     stuff_home_links_climate_base, stuff_home_links_global_affairs_base, stuff_home_links_economics_base
 from Outlets.SKYNEWS import sky_news_home_links_sport_base, sky_news_sport_sub_links, sky_news_home_links_politics_base, \
     sky_news_home_links_climate_base, sky_news_home_links_global_affairs_base, sky_news_home_links_economics_base
-
+from Outlets.USATODAY import usa_today_home_links_sport_base, usa_today_home_links_politics_base, \
+    usa_today_home_links_climate_base, usa_today_home_links_global_affairs_base, usa_today_home_links_economics_base
 
 OUTLETS = {
     'BBC': {
@@ -160,6 +161,13 @@ OUTLETS = {
         'climate': 'https://news.sky.com/climate',
         'global affairs': 'https://news.sky.com/world',
         'economics': 'https://news.sky.com/business'
+    },
+    "USATODAY": {
+        'sport': 'https://www.usatoday.com/sports/',
+        'politics': 'https://www.usatoday.com/news/politics/',
+        'climate': 'https://www.usatoday.com/climate-change/',
+        'global affairs': 'https://www.usatoday.com/news/world/',
+        'economics': 'https://www.usatoday.com/money/'
     }
 }
 
@@ -276,6 +284,81 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             print("Request failed with status code", response.status_code)
 
         return article_content, url
+
+    # region USA Today
+
+    @action_handler('USATODAY')
+    def perform_action18(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = usa_today_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = usa_today_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = usa_today_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = usa_today_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = usa_today_home_links_economics_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            article_obj = self.usa_today_all(url, article_content)
+            if article_obj is not None and len(article_obj['content']) > 0:
+                if isinstance(article_obj, list):
+                    articles = articles + article_obj
+                else:
+                    articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def usa_today_all(self, url, article_content):
+        article_obj = {}
+        try:
+            article_tag = article_content.find('article')
+            title = article_tag.find('h1').get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_tag.find_all(class_=['gnt_ar_by_a gnt_ar_by_a__fi', 'gnt_ar_by_a gnt_ar_by_a__si'])
+            if author is None or len(author) == 0:
+                author = "MSN - No Explicit Author - " + self.topic
+            else:
+                author = " ".join([a.get_text() for a in author])
+                author = re.sub(r'\s+', ' ', author.strip())
+            # Getting first simple date and its last child - this is the better date format
+            time = article_tag.find(class_='gnt_ar_dt').get('aria-label')
+            time = re.sub(r'\s+', ' ', time.strip())
+
+            content = article_tag.find(class_="gnt_ar_b")
+            article_text = []
+            for tag in content.children:
+                if tag.name == 'p' or tag.name == 'h2':
+                    article_text.append(tag.get_text())
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text.strip())
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time,
+                'link': url
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+
+    #  endregion
 
     # region Sky News
 
@@ -401,81 +484,6 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             article_text = []
             for tag in content.children:
                 if tag.name == 'p':
-                    article_text.append(tag.get_text())
-
-            article_text = " ".join(article_text)
-            article_text = re.sub(r'\s+', ' ', article_text.strip())
-
-            article_obj = {
-                'title': title,
-                'writer': author,
-                'content': article_text,
-                'publish_time': time,
-                'link': url
-            }
-
-        except AttributeError:
-            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
-            return None
-        except IndexError:
-            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
-            return None
-
-        return article_obj
-
-    # endregion
-
-    # region The MSN.com
-
-    @action_handler('MSN')
-    def perform_action12(self):
-        articles = []
-        links = []
-        if self.topic == 'sport':
-            links = msn_home_links_sport_base(self.content)
-        if self.topic == 'politics':
-            links = msn_home_links_politics_base(self.content)
-        if self.topic == 'climate':
-            links = msn_home_links_climate_base(self.content)
-        if self.topic == 'global affairs':
-            links = msn_home_links_global_affairs_base(self.content)
-        if self.topic == 'economics':
-            links = msn_home_links_economics_base(self.content)
-
-        # make request to each link and scrape and save content
-        base_url = OUTLETS[self.action][self.topic]
-        for link in links:
-            article_content, url = self.make_request(link, base_url)
-            article_obj = self.msn_all(url, article_content)
-            if article_obj is not None and len(article_obj['content']) > 0:
-                if isinstance(article_obj, list):
-                    articles = articles + article_obj
-                else:
-                    articles.append(article_obj)
-
-        print(articles[0:10])
-        print(len(articles))
-
-    def msn_all(self, url, article_content):
-        article_obj = {}
-        try:
-            article_tag = article_content.find('article')
-            title = article_tag.find('h1').get_text()
-            title = re.sub(r'\s+', ' ', title.strip())
-            author = article_tag.find_all('a', attrs={"rel": "author"})
-            if author is None or len(author) == 0:
-                author = "MSN - No Explicit Author - " + self.topic
-            else:
-                author = " ".join([a.get_text() for a in author])
-                author = re.sub(r'\s+', ' ', author.strip())
-            # Getting first simple date and its last child - this is the better date format
-            time = article_tag.find('time').get('datetime')
-            time = re.sub(r'\s+', ' ', time.strip())
-
-            content = article_tag.find(class_="component article-body-text")
-            article_text = []
-            for tag in content.children:
-                if tag.name == 'p' or tag.name == 'h2':
                     article_text.append(tag.get_text())
 
             article_text = " ".join(article_text)
