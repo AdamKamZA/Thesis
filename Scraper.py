@@ -26,9 +26,6 @@ from Outlets.THEGUARDIAN import guardian_home_links_sport_base, guardian_home_li
     guardian_home_links_climate_base, guardian_home_links_global_affairs_base, guardian_home_links_economics_base
 from Outlets.THESUN import the_sun_home_links_sport_base, the_sun_home_links_politics_base, \
     the_sun_home_links_climate_base, the_sun_home_links_global_affairs_base, the_sun_home_links_economics_base
-from Outlets.MSN import msn_home_links_sport_base, msn_home_links_politics_base, \
-    msn_home_links_climate_base, msn_home_links_global_affairs_base, \
-    msn_home_links_economics_base
 from Outlets.NEWSAU import news_au_home_links_sport_base, news_au_home_links_politics_base, \
     news_au_home_links_climate_base, news_au_home_links_global_affairs_base, news_au_home_links_economics_base
 from Outlets.ABCNET import abc_net_home_links_sport_base, abc_net_home_links_politics_base, \
@@ -41,6 +38,8 @@ from Outlets.SKYNEWS import sky_news_home_links_sport_base, sky_news_sport_sub_l
     sky_news_home_links_climate_base, sky_news_home_links_global_affairs_base, sky_news_home_links_economics_base
 from Outlets.USATODAY import usa_today_home_links_sport_base, usa_today_home_links_politics_base, \
     usa_today_home_links_climate_base, usa_today_home_links_global_affairs_base, usa_today_home_links_economics_base
+from Outlets.ABCNEWS import abc_news_home_links_sport_base, abc_news_home_links_politics_base, \
+    abc_news_home_links_climate_base, abc_news_home_links_global_affairs_base, abc_news_home_links_economics_base
 
 OUTLETS = {
     'BBC': {
@@ -120,13 +119,6 @@ OUTLETS = {
         'global affairs': 'https://www.thesun.co.uk/news/worldnews/',
         'economics': 'https://www.thesun.co.uk/money/business/'
     },
-    "MSN": {
-        'sport': 'https://www.msn.com/en-us/sports',
-        'politics': 'https://www.msn.com/en-us/news/politics',
-        'climate': 'https://www.msn.com/en-us/news/topic/global%20warming',
-        'global affairs': 'https://www.msn.com/en-us/news/world',
-        'economics': 'https://www.msn.com/en-us//money'
-    },
     "NEWSAU": {
         'sport': 'https://www.news.com.au/sport',
         'politics': 'https://www.news.com.au/national/politics',
@@ -168,7 +160,14 @@ OUTLETS = {
         'climate': 'https://www.usatoday.com/climate-change/',
         'global affairs': 'https://www.usatoday.com/news/world/',
         'economics': 'https://www.usatoday.com/money/'
-    }
+    },
+    "ABCNEWS": {
+        'sport': 'https://abcnews.go.com/Sports',
+        'politics': 'https://abcnews.go.com/Politics',
+        'climate': 'https://abcnews.go.com/Alerts/Weather',
+        'global affairs': 'https://abcnews.go.com/International',
+        'economics': 'https://abcnews.go.com/alerts/economy'
+    },
 }
 
 BBC_SPORT = [
@@ -285,6 +284,81 @@ class WebsiteMapper(metaclass=ActionDispatcher):
 
         return article_content, url
 
+    # region ABC News
+
+    @action_handler('ABCNEWS')
+    def perform_action19(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = abc_news_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = abc_news_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = abc_news_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = abc_news_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = abc_news_home_links_economics_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            article_obj = self.abc_news_all(url, article_content)
+            if article_obj is not None and len(article_obj['content']) > 0:
+                if isinstance(article_obj, list):
+                    articles = articles + article_obj
+                else:
+                    articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def abc_news_all(self, url, article_content):
+        article_obj = {}
+        try:
+            title = article_content.find('h1').get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_content.find_all('div', attrs={'data-testid': 'prism-byline'})
+            if author is None or len(author) == 0:
+                author = "ABCNEWS - No Explicit Author - " + self.topic
+            else:
+                author = author[0].find(class_='TQPv HUca ucZk WxHI HhZO yaUf VOJB XSba Umfi ukdD').get_text()
+                author = author.replace('By','')
+                author = re.sub(r'\s+', ' ', author.strip())
+            # Getting first simple date and its last child - this is the better date format
+            time = article_content.find_all('div', attrs={'data-testid': 'prism-byline'})[0]
+            time = time.find(class_='xAPp Zdbe jTKb pCRh').get_text()
+            time = re.sub(r'\s+', ' ', time.strip())
+
+            content = article_content.find_all('article', attrs={'data-testid': 'prism-article-body'})[0]
+            article_text = []
+            for tag in content.children:
+                article_text.append(tag.get_text())
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text.strip())
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time,
+                'link': url
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+
+    # endregion
+
     # region USA Today
 
     @action_handler('USATODAY')
@@ -324,7 +398,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
             title = re.sub(r'\s+', ' ', title.strip())
             author = article_tag.find_all(class_=['gnt_ar_by_a gnt_ar_by_a__fi', 'gnt_ar_by_a gnt_ar_by_a__si'])
             if author is None or len(author) == 0:
-                author = "MSN - No Explicit Author - " + self.topic
+                author = "USA TODAY - No Explicit Author - " + self.topic
             else:
                 author = " ".join([a.get_text() for a in author])
                 author = re.sub(r'\s+', ' ', author.strip())

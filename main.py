@@ -6,7 +6,7 @@ def main():
     # handler = Handler()
     # handler.count_author()
     # handler.close()
-    scraper = Scraper('USATODAY', 'economics')
+    scraper = Scraper('ABCNEWS', 'economics')
     scraper.scrape()
 
 
