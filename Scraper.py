@@ -40,6 +40,9 @@ from Outlets.USATODAY import usa_today_home_links_sport_base, usa_today_home_lin
     usa_today_home_links_climate_base, usa_today_home_links_global_affairs_base, usa_today_home_links_economics_base
 from Outlets.ABCNEWS import abc_news_home_links_sport_base, abc_news_home_links_politics_base, \
     abc_news_home_links_climate_base, abc_news_home_links_global_affairs_base, abc_news_home_links_economics_base
+from Outlets.NPR import npr_home_links_sport_base, npr_home_links_politics_base, npr_home_links_climate_base, \
+    npr_home_links_global_affairs_base, npr_home_links_economics_base
+
 
 OUTLETS = {
     'BBC': {
@@ -168,6 +171,13 @@ OUTLETS = {
         'global affairs': 'https://abcnews.go.com/International',
         'economics': 'https://abcnews.go.com/alerts/economy'
     },
+    "NPR": {
+        'sport': 'https://www.npr.org/sections/sports/',
+        'politics': 'https://www.npr.org/sections/politics/',
+        'climate': 'https://www.npr.org/sections/climate',
+        'global affairs': 'https://www.npr.org/sections/world/',
+        'economics': 'https://www.npr.org/sections/economy/'
+    }
 }
 
 BBC_SPORT = [
@@ -284,10 +294,85 @@ class WebsiteMapper(metaclass=ActionDispatcher):
 
         return article_content, url
 
+    # region NPR
+
+    @action_handler('NPR')
+    def perform_action19(self):
+        articles = []
+        links = []
+        if self.topic == 'sport':
+            links = npr_home_links_sport_base(self.content)
+        if self.topic == 'politics':
+            links = npr_home_links_politics_base(self.content)
+        if self.topic == 'climate':
+            links = npr_home_links_climate_base(self.content)
+        if self.topic == 'global affairs':
+            links = npr_home_links_global_affairs_base(self.content)
+        if self.topic == 'economics':
+            links = npr_home_links_economics_base(self.content)
+
+        # make request to each link and scrape and save content
+        base_url = OUTLETS[self.action][self.topic]
+        for link in links:
+            article_content, url = self.make_request(link, base_url)
+            article_obj = self.npr_all(url, article_content)
+            if article_obj is not None and len(article_obj['content']) > 0:
+                if isinstance(article_obj, list):
+                    articles = articles + article_obj
+                else:
+                    articles.append(article_obj)
+
+        print(articles[0:10])
+        print(len(articles))
+
+    def npr_all(self, url, article_content):
+        article_obj = {}
+        try:
+            article_tag = article_content.find('article')
+            title = article_tag.find('h1').get_text()
+            title = re.sub(r'\s+', ' ', title.strip())
+            author = article_tag.find_all(class_='byline__name byline__name--block')
+            if author is None or len(author) == 0:
+                author = "NPR - No Explicit Author - " + self.topic
+            else:
+                author = " ".join([a.get_text() for a in author])
+                author = re.sub(r'\s+', ' ', author.strip())
+            # Getting first simple date and its last child - this is the better date format
+            time = article_tag.find('time').get('datetime')
+            time = re.sub(r'\s+', ' ', time.strip())
+
+            content = article_tag.find(id="storytext")
+            article_text = []
+            for tag in content.children:
+                if tag.name == 'p' or tag.name == 'h2' or tag.name == 'h3':
+                    article_text.append(tag.get_text())
+
+            article_text = " ".join(article_text)
+            article_text = re.sub(r'\s+', ' ', article_text.strip())
+
+            article_obj = {
+                'title': title,
+                'writer': author,
+                'content': article_text,
+                'publish_time': time,
+                'link': url
+            }
+
+        except AttributeError:
+            print("AttributeError:\nInvalid article structure\nSkipping url: " + url)
+            return None
+        except IndexError:
+            print("IndexError: Most likely invalid article structure\nSkipping url: " + url)
+            return None
+
+        return article_obj
+
+    #  endregion
+
     # region ABC News
 
     @action_handler('ABCNEWS')
-    def perform_action19(self):
+    def perform_action18(self):
         articles = []
         links = []
         if self.topic == 'sport':
@@ -362,7 +447,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
     # region USA Today
 
     @action_handler('USATODAY')
-    def perform_action18(self):
+    def perform_action17(self):
         articles = []
         links = []
         if self.topic == 'sport':
@@ -437,7 +522,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
     # region Sky News
 
     @action_handler('SKYNEWS')
-    def perform_action17(self):
+    def perform_action16(self):
         articles = []
         links = []
         if self.topic == 'sport':
@@ -585,7 +670,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
     # region STUFF.co.nz
 
     @action_handler("STUFF")
-    def perform_action16(self):
+    def perform_action15(self):
         articles = []
         links = []
         if self.topic == 'sport':
@@ -661,7 +746,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
     # region 9NEWS
 
     @action_handler("NINENEWS")
-    def perform_action15(self):
+    def perform_action14(self):
         articles = []
         links = []
         if self.topic == 'sport':
@@ -737,7 +822,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
     # region ABC NET AU
 
     @action_handler("ABCNET")
-    def perform_action14(self):
+    def perform_action13(self):
         articles = []
         links = []
         if self.topic == 'sport':
@@ -816,7 +901,7 @@ class WebsiteMapper(metaclass=ActionDispatcher):
     # region News.com.au
 
     @action_handler("NEWSAU")
-    def perform_action13(self):
+    def perform_action12(self):
         articles = []
         links = []
         if self.topic == 'sport':
